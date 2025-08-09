@@ -48,7 +48,10 @@ func NewDaemon() (*Daemon, error) {
 }
 
 func (d *Daemon) Start() {
-	StartBackgroundTasks(d.Config, d.TokenStore)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	go StartBackgroundTasks(d.Config, d.TokenStore, stopCh)
 
 	cert, publicKey, err := certgen.GenerateSelfSignedCert()
 	if err != nil {
@@ -61,8 +64,10 @@ func (d *Daemon) Start() {
 	if err != nil {
 		log.Fatalf("listener failed: %v", err)
 	}
-	defer listener.Close()
-
+	defer func() {
+		listener.Close()
+		os.Remove(SOCK)
+	}()
 	go d.handleConnections(listener)
 
 	server := &http.Server{
