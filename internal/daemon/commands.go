@@ -11,7 +11,6 @@ import (
 func (d *Daemon) HandleCommand(conn net.Conn, input string) {
 	parts := strings.Fields(input)
 	if len(parts) == 0 {
-		conn.Write([]byte("Unknown command\n"))
 		writeError(conn, "No command provided")
 		return
 	}
@@ -26,69 +25,87 @@ func (d *Daemon) HandleCommand(conn net.Conn, input string) {
 
 		}
 
-		var accounts strings.Builder
+		var accountList strings.Builder
 		for name, _ := range d.Config.Accounts {
-			accounts.WriteString(name + "\n")
+			accountList.WriteString(name + "\n")
 		}
+		writeResponse(conn, accountList.String())
 
-		writeResponse(conn, accounts.String())
 	case "status":
-		var status strings.Builder
+		var status []string
 		for name := range d.Config.Accounts {
 			if _, err := d.TokenStore.Get(name); err != nil {
-				status.WriteString(fmt.Sprintf("%s: token missing or expired \n", name))
+				status = append(status, fmt.Sprintf("%s: token missing or expired", name))
 			} else {
-				status.WriteString(fmt.Sprintf("%s: token valid \n", name))
+				status = append(status, fmt.Sprintf("%s: token valid", name))
 			}
 		}
+		writeResponse(conn, strings.Join(status, "\n"))
 
-		writeResponse(conn, status.String())
 	case "info":
 
-		var info strings.Builder
-
-		info.WriteString(fmt.Sprintf("cache directory: %s\n", SOCK))
-
 		home, _ := os.UserHomeDir()
-		info.WriteString(fmt.Sprintf("config file: %s\n", path.Join(home, VYGRANT_CONFIG)))
-		info.WriteString(fmt.Sprintf("Server running on:\n  HTTP Port: %s\n  HTTPS Port: %s\nHTTPS public key: %s", d.Config.HTTPListen, d.Config.HTTPSListen, d.PublicKey))
-
-		writeResponse(conn, info.String())
+		info := fmt.Sprintf(
+			"Cache directory: %s\nConfig file: %s\nServer running on:\n  HTTP Port: %s\n  HTTPS Port: %s\nHTTPS public key: %s",
+			SOCK,
+			path.Join(home, VYGRANT_CONFIG),
+			d.Config.HTTPListen,
+			d.Config.HTTPSListen,
+			d.PublicKey,
+		)
+		writeResponse(conn, info)
 
 	case "get-token":
 		if !expectArgs(conn, parts, 2, "get-token <account_name>") {
 			return
 		}
 
-		accountName := parts[1]
-		// token, err := storage.LoadToken(accountName)
-		token, err := d.TokenStore.Get(accountName)
+		account := parts[1]
+		token, err := d.TokenStore.Get(account)
 		if err != nil {
-			writeError(conn, "Could not retrieve token for '%s': %v", accountName, err)
+			authLink := fmt.Sprintf("https://localhost:%s/auth?account=%s", d.Config.HTTPSListen, account)
+			writeError(conn, "Could not retrieve token for '%s': %v. Please authenticate. Go to: %s", account, err, authLink)
 			return
 		}
 		writeResponse(conn, token.AccessToken)
+
 	case "delete-token":
 		if !expectArgs(conn, parts, 2, "delete-token <account_name>") {
 			return
 		}
 
 		account := parts[1]
-
-		// err := storage.DeleteToken(account)
 		err := d.TokenStore.Delete(account)
 		if err != nil {
 			writeError(conn, "Could not delete token for '%s': %v", account, err)
 			return
 		}
 		writeResponse(conn, "Token for '%s' deleted", account)
+
 	case "refresh-token":
 		if !expectArgs(conn, parts, 2, "refresh-token <account_name>") {
 			return
 		}
 
 		account := parts[1]
+		token, err := d.TokenStore.Get(account)
+
+		if err != nil || token.RefreshToken == "" {
+			authLink := fmt.Sprintf("https://localhost:%s/auth?account=%s", d.Config.HTTPSListen, account)
+			Notify("vygrant - no refresh token", fmt.Sprintf("No refresh token for '%s'. Authenticate at: %s", account, authLink))
+			writeError(conn, "No refresh token available for '%s'. Please authenticate at: %s", account, authLink)
+			return
+		}
+
+		newToken, err := RefreshToken(account, d.Config, token)
+		if err != nil {
+			writeError(conn, "Failed to refresh token for '%s': %v", account, err)
+			d.TokenStore.Delete(account)
+			return
+		}
+		d.TokenStore.Set(account, newToken)
 		writeResponse(conn, "Token for '%s' refreshed", account)
+
 	default:
 		writeError(conn, "Unknown command '%s'", parts[0])
 	}
