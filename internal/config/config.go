@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/BurntSushi/toml"
+	"golang.org/x/oauth2"
 )
 
 type Account struct {
@@ -39,4 +40,17 @@ func LoadConfigFromEnv() (*Config, error) {
 		return nil, fmt.Errorf("could not load env config")
 	}
 	return LoadConfig(confPath)
+}
+
+func GetOAuth2Config(acct *Account) *oauth2.Config {
+	return &oauth2.Config{
+		ClientID:     acct.ClientID,
+		ClientSecret: acct.ClientSecret,
+		RedirectURL:  acct.RedirectURI,
+		Scopes:       acct.Scopes,
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  acct.AuthURI,
+			TokenURL: acct.TokenURI,
+		},
+	}
 }

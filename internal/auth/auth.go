@@ -128,19 +128,6 @@ const errorHTML = `
 </html>
 `
 
-func getOAuth2Config(acct *config.Account) *oauth2.Config {
-	return &oauth2.Config{
-		ClientID:     acct.ClientID,
-		ClientSecret: acct.ClientSecret,
-		RedirectURL:  acct.RedirectURI,
-		Scopes:       acct.Scopes,
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  acct.AuthURI,
-			TokenURL: acct.TokenURI,
-		},
-	}
-}
-
 func StartAuthFlow(w http.ResponseWriter, r *http.Request) {
 	accountName := r.URL.Query().Get("account")
 	acct, ok := LoadedAccounts[accountName]
@@ -150,7 +137,7 @@ func StartAuthFlow(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, errorHTML, "Account '"+accountName+"' not found.")
 		return
 	}
-	oauthCfg := getOAuth2Config(acct)
+	oauthCfg := config.GetOAuth2Config(acct)
 
 	state := "account:" + accountName
 	authURL := oauthCfg.AuthCodeURL(state, oauth2.AccessTypeOffline)
@@ -184,7 +171,7 @@ func HandleOAuthCallback(tokenStore storage.TokenStore) http.HandlerFunc {
 			writeErrorPage(w, http.StatusBadRequest, "Invalid Account")
 			return
 		}
-		oauthCfg := getOAuth2Config(acct)
+		oauthCfg := config.GetOAuth2Config(acct)
 
 		code := r.URL.Query().Get("code")
 		token, err := oauthCfg.Exchange(context.Background(), code)
