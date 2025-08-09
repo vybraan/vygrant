@@ -25,7 +25,6 @@ func GenerateSelfSignedCert() (tls.Certificate, string, error) {
 	pubkey = append(pubkey, priv.PublicKey.Y.Bytes()...)
 	pubKeyHex := FormatPublicKey(pubkey)
 
-	// Create a template for a self-signed cert
 	serialNumber, _ := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
@@ -44,7 +43,6 @@ func GenerateSelfSignedCert() (tls.Certificate, string, error) {
 		return tls.Certificate{}, "", err
 	}
 
-	// PEM encode the certificate and private key
 	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 	privBytes, _ := x509.MarshalECPrivateKey(priv)
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: privBytes})

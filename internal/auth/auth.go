@@ -152,7 +152,6 @@ func StartAuthFlow(w http.ResponseWriter, r *http.Request) {
 	}
 	oauthCfg := getOAuth2Config(acct)
 
-	// authURL := oauthCfg.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
 	state := "account:" + accountName
 	authURL := oauthCfg.AuthCodeURL(state, oauth2.AccessTypeOffline)
 
@@ -169,43 +168,37 @@ func writeErrorPage(w http.ResponseWriter, status int, message string) {
 	fmt.Fprintf(w, errorHTML, message)
 }
 
-func HandleOAuthCallback(w http.ResponseWriter, r *http.Request) {
+func HandleOAuthCallback(tokenStore storage.TokenStore) http.HandlerFunc {
 
-	state := r.URL.Query().Get("state")
-	if !strings.HasPrefix(state, "account:") {
-		writeErrorPage(w, http.StatusBadRequest, "Invalid state parameter.")
-		return
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		state := r.URL.Query().Get("state")
+		if !strings.HasPrefix(state, "account:") {
+			writeErrorPage(w, http.StatusBadRequest, "Invalid state parameter.")
+			return
+		}
+		accountName := strings.TrimPrefix(state, "account:")
+
+		acct, ok := LoadedAccounts[accountName]
+		if !ok {
+			writeErrorPage(w, http.StatusBadRequest, "Invalid Account")
+			return
+		}
+		oauthCfg := getOAuth2Config(acct)
+
+		code := r.URL.Query().Get("code")
+		token, err := oauthCfg.Exchange(context.Background(), code)
+		if err != nil {
+
+			writeErrorPage(w, http.StatusInternalServerError, "failed to exchange token. Please try again.")
+
+			log.Printf("token exchange error for account %s: %v", accountName, err)
+			return
+		}
+
+		tokenStore.Set(accountName, token)
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		fmt.Fprintf(w, successHTML, accountName)
 	}
-	accountName := strings.TrimPrefix(state, "account:")
-
-	// accountName := r.URL.Query().Get("account")
-	acct, ok := LoadedAccounts[accountName]
-	if !ok {
-		writeErrorPage(w, http.StatusBadRequest, "Invalid Account")
-		return
-	}
-	oauthCfg := getOAuth2Config(acct)
-
-	code := r.URL.Query().Get("code")
-	token, err := oauthCfg.Exchange(context.Background(), code)
-	if err != nil {
-
-		writeErrorPage(w, http.StatusInternalServerError, "failed to exchange token. Please try again.")
-
-		log.Printf("token exchange error for account %s: %v", accountName, err)
-		return
-	}
-
-	err = storage.SaveToken(accountName, token)
-	if err != nil {
-		writeErrorPage(w, http.StatusInternalServerError, "failed to save token. Please try again.")
-
-		log.Printf("failed to save token for account %s: %v", accountName, err)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprintf(w, successHTML, accountName)
-
-	// fmt.Fprintf(w, "Authentication successful for %s.", accountName)
 }

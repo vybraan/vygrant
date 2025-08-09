@@ -67,7 +67,7 @@ func (d *Daemon) Start() {
 
 	server := &http.Server{
 		Addr:    "localhost:" + d.Config.HTTPSListen,
-		Handler: api.Router(),
+		Handler: api.Router(&d.TokenStore),
 		TLSConfig: &tls.Config{
 			Certificates: []tls.Certificate{cert},
 		},
