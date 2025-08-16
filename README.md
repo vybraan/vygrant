@@ -11,6 +11,19 @@
 - **Auto-refresh & notifications**: Optional background token refresh with notification support on Linux/macOS/Windows.
 
 ##  Installation
+### Arch Linux
+You can install `vygrant` from the AUR using an AUR helper like `yay` or `paru`:
+```bash
+yay -S vygrant
+# or
+paru -S vygrant
+```
+Else you can install it manually using `git` and `makepkg`:
+```bash
+git clone https://aur.archlinux.org/vygrant.git 
+cd vygrant
+makepkg -si
+```
 ### Manual
 ```bash
 git clone https://github.com/vybraan/vygrant.git
