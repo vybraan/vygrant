@@ -12,6 +12,7 @@ const defaultConfigContent = `# vygrant configuration file
 
 https_listen = "8080"
 http_listen = "none"
+persist_tokens = true
 [account]
 # [account.example]
 # auth_uri = "https://example.com/oauth2/authorize"

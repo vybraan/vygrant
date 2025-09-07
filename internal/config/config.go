@@ -19,9 +19,10 @@ type Account struct {
 }
 
 type Config struct {
-	HTTPSListen string              `toml:"https_listen"`
-	HTTPListen  string              `toml:"http_listen"`
-	Accounts    map[string]*Account `toml:"account"`
+	HTTPSListen   string              `toml:"https_listen"`
+	HTTPListen    string              `toml:"http_listen"`
+	PersistTokens bool                `toml:"persist_tokens"`
+	Accounts      map[string]*Account `toml:"account"`
 }
 
 func LoadConfig(path string) (*Config, error) {
