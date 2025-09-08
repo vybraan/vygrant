@@ -18,10 +18,12 @@ func NewMemoryStore() *MemoryStore {
 	}
 }
 
-func (m *MemoryStore) Set(account string, token *oauth2.Token) {
+func (m *MemoryStore) Set(account string, token *oauth2.Token) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.tokens[account] = token
+
+	return nil
 }
 
 func (m *MemoryStore) Get(account string) (*oauth2.Token, error) {

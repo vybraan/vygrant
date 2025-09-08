@@ -41,9 +41,19 @@ func NewDaemon() (*Daemon, error) {
 
 	auth.LoadedAccounts = cfg.Accounts
 
+	var store storage.TokenStore
+
+	if cfg.PersistTokens {
+		home, _ := os.UserHomeDir()
+		storePath := path.Join(home, ".vybr/vygrant/tokens.json")
+		store = storage.NewFileStore(storePath)
+	} else {
+		store = storage.NewMemoryStore()
+	}
+
 	return &Daemon{
 		Config:     cfg,
-		TokenStore: storage.NewMemoryStore(),
+		TokenStore: store,
 	}, nil
 }
 

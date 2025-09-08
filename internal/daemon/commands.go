@@ -26,7 +26,7 @@ func (d *Daemon) HandleCommand(conn net.Conn, input string) {
 		}
 
 		var accountList strings.Builder
-		for name, _ := range d.Config.Accounts {
+		for name := range d.Config.Accounts {
 			accountList.WriteString(name + "\n")
 		}
 		writeResponse(conn, accountList.String())
