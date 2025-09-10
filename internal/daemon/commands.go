@@ -104,6 +104,7 @@ func (d *Daemon) HandleCommand(conn net.Conn, input string) {
 			return
 		}
 		d.TokenStore.Set(account, newToken)
+		Notify("vygrant - token refreshed", fmt.Sprintf("Token for '%s' successfully refreshed.", account))
 		writeResponse(conn, "Token for '%s' refreshed", account)
 
 	default:
