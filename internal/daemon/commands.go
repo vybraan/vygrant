@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 )
 
 func (d *Daemon) HandleCommand(conn net.Conn, input string) {
@@ -62,11 +63,28 @@ func (d *Daemon) HandleCommand(conn net.Conn, input string) {
 
 		account := parts[1]
 		token, err := d.TokenStore.Get(account)
+
 		if err != nil {
 			authLink := fmt.Sprintf("https://localhost:%s/auth?account=%s", d.Config.HTTPSListen, account)
 			writeError(conn, "Could not retrieve token for '%s': %v. Please authenticate. Go to: %s", account, err, authLink)
 			return
 		}
+
+		// Auto-refresh token if expired
+		if err == nil && token.Expiry.Before(time.Now()) && token.RefreshToken != "" {
+			newToken, err := RefreshToken(account, d.Config, token)
+			if err != nil {
+
+				Notify("vygrant - auto refresh failed", fmt.Sprintf("Token for '%s' could not be refreshed and has been deleted. Please re-authenticate.", account))
+				writeError(conn, "Failed to auto refresh token for '%s': %v", account, err)
+				d.TokenStore.Delete(account)
+				return
+			}
+			d.TokenStore.Set(account, newToken)
+			token = newToken
+			Notify("vygrant - token refreshed", fmt.Sprintf("Token for '%s' successfully refreshed.", account))
+		}
+
 		writeResponse(conn, token.AccessToken)
 
 	case "delete-token":
