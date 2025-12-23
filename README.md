@@ -116,6 +116,16 @@ tls_trust_file	/etc/ssl/certs/ca-certificates.crt
 tls_starttls
 ```
 
+## Alternatives
+vygrant is very simple. You may also consider these
+programs as alternatives:
+
+* [Pizauth](https://github.com/ltratt/pizauth)
+* [Email OAuth 2.0 Proxy](https://github.com/simonrob/email-oauth2-proxy)
+* [mailctl](https://github.com/pdobsan/mailctl)
+* [mutt_oauth2.py](https://gitlab.com/muttmua/mutt/-/blob/master/contrib/mutt_oauth2.py)
+* [oauth-helper-office-365](https://github.com/ahrex/oauth-helper-office-365)
+
 ## Contributing & License
 
 Contributions are welcome! Please fork, submit pull requests, or file issues for enhancements or bug fixes.
