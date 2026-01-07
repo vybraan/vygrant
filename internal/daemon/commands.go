@@ -46,13 +46,17 @@ func (d *Daemon) HandleCommand(conn net.Conn, input string) {
 	case "info":
 
 		home, _ := os.UserHomeDir()
+		publicKey := d.PublicKey
+		if !isListenerEnabled(d.Config.HTTPSListen) {
+			publicKey = "disabled"
+		}
 		info := fmt.Sprintf(
 			"Cache directory: %s\nConfig file: %s\nServer running on:\n  HTTP Port: %s\n  HTTPS Port: %s\nHTTPS public key: %s",
 			SOCK,
 			path.Join(home, VYGRANT_CONFIG),
 			d.Config.HTTPListen,
 			d.Config.HTTPSListen,
-			d.PublicKey,
+			publicKey,
 		)
 		writeResponse(conn, info)
 
@@ -65,7 +69,7 @@ func (d *Daemon) HandleCommand(conn net.Conn, input string) {
 		token, err := d.TokenStore.Get(account)
 
 		if err != nil {
-			authLink := fmt.Sprintf("https://localhost:%s/auth?account=%s", d.Config.HTTPSListen, account)
+			authLink := d.authURL(account)
 			writeError(conn, "Could not retrieve token for '%s': %v. Please authenticate. Go to: %s", account, err, authLink)
 			return
 		}
@@ -109,7 +113,7 @@ func (d *Daemon) HandleCommand(conn net.Conn, input string) {
 		token, err := d.TokenStore.Get(account)
 
 		if err != nil || token.RefreshToken == "" {
-			authLink := fmt.Sprintf("https://localhost:%s/auth?account=%s", d.Config.HTTPSListen, account)
+			authLink := d.authURL(account)
 			Notify("vygrant - no refresh token", fmt.Sprintf("No refresh token for '%s'. Authenticate at: %s", account, authLink))
 			writeError(conn, "No refresh token available for '%s'. Please authenticate at: %s", account, authLink)
 			return
@@ -128,6 +132,32 @@ func (d *Daemon) HandleCommand(conn net.Conn, input string) {
 	default:
 		writeError(conn, "Unknown command '%s'", parts[0])
 	}
+}
+
+func (d *Daemon) authURL(account string) string {
+	httpsEnabled := isListenerEnabled(d.Config.HTTPSListen)
+	httpEnabled := isListenerEnabled(d.Config.HTTPListen)
+	scheme := "https"
+	port := d.Config.HTTPSListen
+	if acct, ok := d.Config.Accounts[account]; ok {
+		redirect := strings.ToLower(strings.TrimSpace(acct.RedirectURI))
+		if strings.HasPrefix(redirect, "http://") {
+			scheme = "http"
+			port = d.Config.HTTPListen
+		} else if strings.HasPrefix(redirect, "https://") {
+			scheme = "https"
+			port = d.Config.HTTPSListen
+		}
+	}
+	if scheme == "https" && !httpsEnabled && httpEnabled {
+		scheme = "http"
+		port = d.Config.HTTPListen
+	}
+	if scheme == "http" && !httpEnabled && httpsEnabled {
+		scheme = "https"
+		port = d.Config.HTTPSListen
+	}
+	return fmt.Sprintf("%s://localhost:%s/auth?account=%s", scheme, port, account)
 }
 
 func expectArgs(conn net.Conn, parts []string, expected int, usage string) bool {
