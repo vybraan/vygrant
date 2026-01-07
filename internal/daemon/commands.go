@@ -51,8 +51,8 @@ func (d *Daemon) HandleCommand(conn net.Conn, input string) {
 			publicKey = "disabled"
 		}
 		info := fmt.Sprintf(
-			"Cache directory: %s\nConfig file: %s\nServer running on:\n  HTTP Port: %s\n  HTTPS Port: %s\nHTTPS public key: %s",
-			SOCK,
+			"Socket path: %s\nConfig file: %s\nServer running on:\n  HTTP Port: %s\n  HTTPS Port: %s\nHTTPS public key: %s",
+			SocketPath(),
 			path.Join(home, VYGRANT_CONFIG),
 			d.Config.HTTPListen,
 			d.Config.HTTPSListen,

@@ -10,7 +10,7 @@ import (
 
 func SendCommand(command string) (string, error) {
 
-	conn, err := net.Dial("unix", daemon.SOCK)
+	conn, err := net.Dial("unix", daemon.SocketPath())
 	if err != nil {
 		return "", fmt.Errorf("failed to connect to daemon: %w", err)
 	}
