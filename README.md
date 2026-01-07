@@ -88,6 +88,7 @@ Vygrant generates a local CA and a `localhost` certificate on first run. To avoi
 
 - Use the built-in command: `vygrant trust` (add `--system` for system trust where supported).
 - CA certificate path: `~/.vybr/vygrant/certs/vygrant_ca.pem`
+ - To remove trust later, run: `vygrant untrust` (add `--system` for system trust).
 
 If you reinstall on another machine, a new CA is generated and should be trusted again.
 
