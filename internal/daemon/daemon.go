@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/vybraan/vygrant/internal/api"
 	"github.com/vybraan/vygrant/internal/auth"
@@ -63,11 +64,22 @@ func (d *Daemon) Start() {
 
 	go StartBackgroundTasks(d.Config, d.TokenStore, stopCh)
 
-	cert, publicKey, err := certgen.GenerateSelfSignedCert()
-	if err != nil {
-		log.Fatalf("tls setup failed: %v", err)
+	httpsEnabled := isListenerEnabled(d.Config.HTTPSListen)
+	httpEnabled := isListenerEnabled(d.Config.HTTPListen)
+	if !httpsEnabled && !httpEnabled {
+		log.Fatal("no HTTP or HTTPS listener configured")
 	}
-	d.PublicKey = publicKey
+
+	var cert tls.Certificate
+	if httpsEnabled {
+		publicKey := ""
+		var err error
+		cert, publicKey, err = certgen.GenerateSelfSignedCert()
+		if err != nil {
+			log.Fatalf("tls setup failed: %v", err)
+		}
+		d.PublicKey = publicKey
+	}
 
 	os.Remove(SOCK)
 	listener, err := net.Listen("unix", SOCK)
@@ -80,21 +92,43 @@ func (d *Daemon) Start() {
 	}()
 	go d.handleConnections(listener)
 
-	server := &http.Server{
-		Addr:    "localhost:" + d.Config.HTTPSListen,
-		Handler: api.Router(&d.TokenStore),
-		TLSConfig: &tls.Config{
-			Certificates: []tls.Certificate{cert},
-		},
-	}
+	handler := api.Router(&d.TokenStore)
 
 	http.DefaultClient.Transport = &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 
+	if httpEnabled {
+		httpServer := &http.Server{
+			Addr:    "localhost:" + d.Config.HTTPListen,
+			Handler: handler,
+		}
+		if httpsEnabled {
+			go func() {
+				if err := httpServer.ListenAndServe(); err != nil {
+					log.Fatalf("http server crashed: %v", err)
+				}
+			}()
+		} else {
+			log.Println("oauth2 daemon is running (http only)")
+			if err := httpServer.ListenAndServe(); err != nil {
+				log.Fatalf("server crashed: %v", err)
+			}
+			return
+		}
+	}
+
+	httpsServer := &http.Server{
+		Addr:    "localhost:" + d.Config.HTTPSListen,
+		Handler: handler,
+		TLSConfig: &tls.Config{
+			Certificates: []tls.Certificate{cert},
+		},
+	}
+
 	log.Println("oauth2 daemon is running")
-	if err := server.ListenAndServeTLS("", ""); err != nil {
-		log.Fatalf("server crashed: %v", err)
+	if err := httpsServer.ListenAndServeTLS("", ""); err != nil {
+		log.Fatalf("https server crashed: %v", err)
 	}
 }
 
@@ -116,4 +150,9 @@ func (d *Daemon) handle(conn net.Conn) {
 		input := scanner.Text()
 		d.HandleCommand(conn, input)
 	}
+}
+
+func isListenerEnabled(port string) bool {
+	trimmed := strings.TrimSpace(strings.ToLower(port))
+	return trimmed != "" && trimmed != "none" && trimmed != "off" && trimmed != "disabled"
 }

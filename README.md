@@ -67,7 +67,7 @@ scopes = ["openid", "profile", "email"]
 #### Optional Settings
 
 - `https_listen`: Port for HTTPS callbacks (default `8080`).
-- `http_listen`: Port for HTTP callbacks (default disabled).
+- `http_listen`: Port for HTTP callbacks (default disabled). Use this with `redirect_uri = "http://localhost:<port>"` if your browser blocks the self-signed HTTPS callback.
 - `persist_tokens`: Whether to save tokens to disk (default `true`).
 
 ###### You may use Thunderbird's OAuth2 client ID/secret for Microsoft accounts, but it's recommended to create your own credentials.
@@ -81,6 +81,15 @@ vygrant server
 ```
 
 The daemon will listen for OAuth2 callbacks and manage the tokens.
+
+#### Trusting the local certificate (one-time)
+
+Vygrant generates a local CA and a `localhost` certificate on first run. To avoid browser warnings for HTTPS callbacks, import and trust the CA certificate once:
+
+- Use the built-in command: `vygrant trust` (add `--system` for system trust where supported).
+- CA certificate path: `~/.vybr/vygrant/certs/vygrant_ca.pem`
+
+If you reinstall on another machine, a new CA is generated and should be trusted again.
 
 ### 3. Authenticate via CLI
 

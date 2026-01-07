@@ -20,6 +20,7 @@ persist_tokens = true
 # client_id = "your_client_id"
 # client_secret = "your_client_secret"
 # redirect_uri = "https://localhost:8080"
+# redirect_uri = "http://localhost:8080" # use with http_listen to avoid self-signed TLS warnings
 # scopes = [
 #   "profile",
 #   "name",
