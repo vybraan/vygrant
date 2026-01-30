@@ -8,10 +8,10 @@ import (
 	"github.com/vybraan/vygrant/internal/storage"
 )
 
-func Router(tokenStore *storage.TokenStore) http.Handler {
+func Router(tokenStore *storage.TokenStore, httpClient *http.Client) http.Handler {
 	r := chi.NewRouter()
 
-	r.Get("/", auth.HandleOAuthCallback(*tokenStore))
+	r.Get("/", auth.HandleOAuthCallback(*tokenStore, httpClient))
 	r.Get("/auth", auth.StartAuthFlow)
 
 	return r

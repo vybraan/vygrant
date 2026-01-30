@@ -76,7 +76,7 @@ func (d *Daemon) HandleCommand(conn net.Conn, input string) {
 
 		// Auto-refresh token if expired
 		if err == nil && token.Expiry.Before(time.Now()) && token.RefreshToken != "" {
-			newToken, err := RefreshToken(account, d.Config, token)
+			newToken, err := RefreshToken(account, d.Config, token, d.HTTPClient)
 			if err != nil {
 
 				Notify("vygrant - auto refresh failed", fmt.Sprintf("Token for '%s' could not be refreshed and has been deleted. Please re-authenticate.", account))
@@ -119,7 +119,7 @@ func (d *Daemon) HandleCommand(conn net.Conn, input string) {
 			return
 		}
 
-		newToken, err := RefreshToken(account, d.Config, token)
+		newToken, err := RefreshToken(account, d.Config, token, d.HTTPClient)
 		if err != nil {
 			writeError(conn, "Failed to refresh token for '%s': %v", account, err)
 			d.TokenStore.Delete(account)

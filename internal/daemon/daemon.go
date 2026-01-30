@@ -26,6 +26,7 @@ type Daemon struct {
 	Config     *config.Config
 	TokenStore storage.TokenStore
 	PublicKey  string
+	HTTPClient *http.Client
 }
 
 func NewDaemon() (*Daemon, error) {
@@ -62,7 +63,14 @@ func (d *Daemon) Start() {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	go StartBackgroundTasks(d.Config, d.TokenStore, stopCh)
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+	d.HTTPClient = httpClient
+
+	go StartBackgroundTasks(d.Config, d.TokenStore, d.HTTPClient, stopCh)
 
 	httpsEnabled := isListenerEnabled(d.Config.HTTPSListen)
 	httpEnabled := isListenerEnabled(d.Config.HTTPListen)
@@ -81,11 +89,7 @@ func (d *Daemon) Start() {
 		d.PublicKey = publicKey
 	}
 
-	handler := api.Router(&d.TokenStore)
-
-	http.DefaultClient.Transport = &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
+	handler := api.Router(&d.TokenStore, d.HTTPClient)
 
 	httpAddr := "localhost:" + d.Config.HTTPListen
 	httpsAddr := "localhost:" + d.Config.HTTPSListen
@@ -161,6 +165,7 @@ func (d *Daemon) Start() {
 		Handler: handler,
 		TLSConfig: &tls.Config{
 			Certificates: []tls.Certificate{cert},
+			MinVersion:   tls.VersionTLS12,
 		},
 	}
 

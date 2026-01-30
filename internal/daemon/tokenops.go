@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"log"
+	"net/http"
 	"time"
 
 	"github.com/vybraan/vygrant/internal/config"
@@ -10,15 +11,18 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func RefreshToken(account string, cfg *config.Config, oldToken *oauth2.Token) (*oauth2.Token, error) {
+func RefreshToken(account string, cfg *config.Config, oldToken *oauth2.Token, httpClient *http.Client) (*oauth2.Token, error) {
 	acct := cfg.Accounts[account]
 	if acct == nil {
 		return nil, ErrAccountNotFound
 	}
 
 	oauthCfg := config.GetOAuth2Config(acct)
-
-	ts := oauthCfg.TokenSource(context.Background(), oldToken)
+	ctx := context.Background()
+	if httpClient != nil {
+		ctx = context.WithValue(ctx, oauth2.HTTPClient, httpClient)
+	}
+	ts := oauthCfg.TokenSource(ctx, oldToken)
 	newToken, err := ts.Token()
 	if err != nil {
 		return nil, err
@@ -26,7 +30,7 @@ func RefreshToken(account string, cfg *config.Config, oldToken *oauth2.Token) (*
 	return newToken, nil
 }
 
-func checkExpiringTokens(cfg *config.Config, tokenStore storage.TokenStore) {
+func checkExpiringTokens(cfg *config.Config, tokenStore storage.TokenStore, httpClient *http.Client) {
 	for account := range cfg.Accounts {
 		token, err := tokenStore.Get(account)
 		if err != nil || token == nil {
@@ -38,7 +42,7 @@ func checkExpiringTokens(cfg *config.Config, tokenStore storage.TokenStore) {
 		}
 
 		if token.Expiry.Before(time.Now().Add(expiryThreshold)) {
-			newToken, err := RefreshToken(account, cfg, token)
+			newToken, err := RefreshToken(account, cfg, token, httpClient)
 			if err != nil {
 				log.Printf("failed to auto-refresh token for %s: %v", account, err)
 				Notify("vygrant - auto refresh", "Token for "+account+" could not be refreshed.")

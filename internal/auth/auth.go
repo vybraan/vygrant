@@ -155,7 +155,7 @@ func writeErrorPage(w http.ResponseWriter, status int, message string) {
 	fmt.Fprintf(w, errorHTML, message)
 }
 
-func HandleOAuthCallback(tokenStore storage.TokenStore) http.HandlerFunc {
+func HandleOAuthCallback(tokenStore storage.TokenStore, httpClient *http.Client) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -172,9 +172,13 @@ func HandleOAuthCallback(tokenStore storage.TokenStore) http.HandlerFunc {
 			return
 		}
 		oauthCfg := config.GetOAuth2Config(acct)
+		ctx := context.Background()
+		if httpClient != nil {
+			ctx = context.WithValue(ctx, oauth2.HTTPClient, httpClient)
+		}
 
 		code := r.URL.Query().Get("code")
-		token, err := oauthCfg.Exchange(context.Background(), code)
+		token, err := oauthCfg.Exchange(ctx, code)
 		if err != nil {
 
 			writeErrorPage(w, http.StatusInternalServerError, "failed to exchange token. Please try again.")
