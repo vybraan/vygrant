@@ -8,9 +8,12 @@ import (
 	"github.com/vybraan/vygrant/internal/daemon"
 )
 
+// SendCommand sends a text command to the daemon over the Unix domain socket.
+// It returns the daemon's response with leading and trailing whitespace removed,
+// or an error if connecting, writing, or reading from the socket fails.
 func SendCommand(command string) (string, error) {
 
-	conn, err := net.Dial("unix", daemon.SOCK)
+	conn, err := net.Dial("unix", daemon.SocketPath())
 	if err != nil {
 		return "", fmt.Errorf("failed to connect to daemon: %w", err)
 	}

@@ -3,6 +3,7 @@ package daemon
 import (
 	"bufio"
 	"crypto/tls"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -19,15 +20,24 @@ import (
 
 const (
 	VYGRANT_CONFIG = ".config/vybr/vygrant.toml"
-	SOCK           = "/tmp/vygrant.sock"
 )
 
 type Daemon struct {
 	Config     *config.Config
 	TokenStore storage.TokenStore
 	PublicKey  string
+	HTTPClient *http.Client
 }
 
+// NewDaemon creates a Daemon by loading configuration and initializing token storage.
+// 
+// It loads configuration from the path specified by the VYGRANT_CONFIG environment
+// variable or from the default user config path (~/.config/vybr/vygrant.toml). If
+// configuration loading fails, an error is returned. The function populates
+// auth.LoadedAccounts from the loaded configuration and selects the token store:
+// a file-based store at ~/.vybr/vygrant/tokens.json when cfg.PersistTokens is
+// true, or an in-memory store otherwise. The returned Daemon has Config and
+// TokenStore initialized.
 func NewDaemon() (*Daemon, error) {
 	confPath := os.Getenv("VYGRANT_CONFIG")
 	if confPath == "" {
@@ -62,7 +72,14 @@ func (d *Daemon) Start() {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	go StartBackgroundTasks(d.Config, d.TokenStore, stopCh)
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+	d.HTTPClient = httpClient
+
+	go StartBackgroundTasks(d.Config, d.TokenStore, d.HTTPClient, stopCh)
 
 	httpsEnabled := isListenerEnabled(d.Config.HTTPSListen)
 	httpEnabled := isListenerEnabled(d.Config.HTTPListen)
@@ -81,37 +98,72 @@ func (d *Daemon) Start() {
 		d.PublicKey = publicKey
 	}
 
-	os.Remove(SOCK)
-	listener, err := net.Listen("unix", SOCK)
+	handler := api.Router(&d.TokenStore, d.HTTPClient)
+
+	httpAddr := "localhost:" + d.Config.HTTPListen
+	httpsAddr := "localhost:" + d.Config.HTTPSListen
+
+	var httpListener net.Listener
+	var httpsListener net.Listener
+	var err error
+
+	if httpEnabled {
+		httpListener, err = net.Listen("tcp", httpAddr)
+		if err != nil {
+			log.Fatalf("http listener failed: %v", err)
+		}
+	}
+
+	if httpsEnabled {
+		httpsListener, err = net.Listen("tcp", httpsAddr)
+		if err != nil {
+			if httpListener != nil {
+				httpListener.Close()
+			}
+			log.Fatalf("https listener failed: %v", err)
+		}
+	}
+
+	socketPath, err := ensureSocketAvailable()
 	if err != nil {
-		log.Fatalf("listener failed: %v", err)
+		if httpListener != nil {
+			httpListener.Close()
+		}
+		if httpsListener != nil {
+			httpsListener.Close()
+		}
+		log.Fatal(err)
+	}
+
+	socketListener, err := net.Listen("unix", socketPath)
+	if err != nil {
+		if httpListener != nil {
+			httpListener.Close()
+		}
+		if httpsListener != nil {
+			httpsListener.Close()
+		}
+		log.Fatalf("socket listener failed: %v", err)
 	}
 	defer func() {
-		listener.Close()
-		os.Remove(SOCK)
+		socketListener.Close()
+		os.Remove(socketPath)
 	}()
-	go d.handleConnections(listener)
-
-	handler := api.Router(&d.TokenStore)
-
-	http.DefaultClient.Transport = &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
+	go d.handleConnections(socketListener)
 
 	if httpEnabled {
 		httpServer := &http.Server{
-			Addr:    "localhost:" + d.Config.HTTPListen,
 			Handler: handler,
 		}
 		if httpsEnabled {
 			go func() {
-				if err := httpServer.ListenAndServe(); err != nil {
+				if err := httpServer.Serve(httpListener); err != nil {
 					log.Fatalf("http server crashed: %v", err)
 				}
 			}()
 		} else {
 			log.Println("oauth2 daemon is running (http only)")
-			if err := httpServer.ListenAndServe(); err != nil {
+			if err := httpServer.Serve(httpListener); err != nil {
 				log.Fatalf("server crashed: %v", err)
 			}
 			return
@@ -119,15 +171,16 @@ func (d *Daemon) Start() {
 	}
 
 	httpsServer := &http.Server{
-		Addr:    "localhost:" + d.Config.HTTPSListen,
 		Handler: handler,
 		TLSConfig: &tls.Config{
 			Certificates: []tls.Certificate{cert},
+			MinVersion:   tls.VersionTLS12,
 		},
 	}
 
 	log.Println("oauth2 daemon is running")
-	if err := httpsServer.ListenAndServeTLS("", ""); err != nil {
+	tlsListener := tls.NewListener(httpsListener, httpsServer.TLSConfig)
+	if err := httpsServer.Serve(tlsListener); err != nil {
 		log.Fatalf("https server crashed: %v", err)
 	}
 }
@@ -152,7 +205,39 @@ func (d *Daemon) handle(conn net.Conn) {
 	}
 }
 
+// isListenerEnabled reports whether the given listener port string enables a listener.
+// It treats an empty string or the values "none", "off", and "disabled" (case-insensitive, with surrounding whitespace ignored) as disabled; all other values are considered enabled.
 func isListenerEnabled(port string) bool {
 	trimmed := strings.TrimSpace(strings.ToLower(port))
 	return trimmed != "" && trimmed != "none" && trimmed != "off" && trimmed != "disabled"
+}
+
+// ensureSocketAvailable verifies the application's UNIX socket path is usable and returns it.
+//
+// It returns an error if the socket path cannot be determined, if the path exists but is not a UNIX socket,
+// or if another process is already listening on the socket. If a stale socket file exists and is removable,
+// it removes that file and returns the path.
+func ensureSocketAvailable() (string, error) {
+	socketPath := SocketPath()
+	if socketPath == "" {
+		return "", fmt.Errorf("could not determine socket path")
+	}
+
+	info, err := os.Stat(socketPath)
+	if err == nil {
+		if info.Mode()&os.ModeSocket == 0 {
+			return "", fmt.Errorf("socket path exists and is not a socket: %s", socketPath)
+		}
+		if conn, err := net.Dial("unix", socketPath); err == nil {
+			conn.Close()
+			return "", fmt.Errorf("daemon already running on %s", socketPath)
+		}
+		if err := os.Remove(socketPath); err != nil {
+			return "", fmt.Errorf("failed to remove stale socket: %v", err)
+		}
+	} else if !os.IsNotExist(err) {
+		return "", fmt.Errorf("failed to stat socket: %v", err)
+	}
+
+	return socketPath, nil
 }
