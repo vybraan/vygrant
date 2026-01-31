@@ -11,6 +11,9 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// RefreshToken obtains a new OAuth2 token for the named account using the provided existing token.
+// If httpClient is non-nil it is attached to the refresh request context and used for HTTP calls.
+// It returns ErrAccountNotFound if the account is not present in cfg.Accounts, or any error produced by the token source when fetching the new token.
 func RefreshToken(account string, cfg *config.Config, oldToken *oauth2.Token, httpClient *http.Client) (*oauth2.Token, error) {
 	acct := cfg.Accounts[account]
 	if acct == nil {
@@ -30,6 +33,10 @@ func RefreshToken(account string, cfg *config.Config, oldToken *oauth2.Token, ht
 	return newToken, nil
 }
 
+// checkExpiringTokens iterates configured accounts and refreshes tokens whose expiry is within expiryThreshold.
+// It skips accounts with no stored token or without a refresh token. For tokens needing refresh it calls
+// RefreshToken (using the provided httpClient when non-nil), updates tokenStore on success, and logs and
+// notifies on refresh failures. If a token is already expired it logs and sends an expiration notification.
 func checkExpiringTokens(cfg *config.Config, tokenStore storage.TokenStore, httpClient *http.Client) {
 	for account := range cfg.Accounts {
 		token, err := tokenStore.Get(account)

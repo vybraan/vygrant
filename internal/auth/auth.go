@@ -149,12 +149,17 @@ func StartAuthFlow(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, authURL, http.StatusFound)
 }
 
+// writeErrorPage writes an HTML error response using the provided HTTP status and message.
+// It sets the Content-Type to "text/html; charset=utf-8" and writes the body by formatting the package's errorHTML template with the message.
 func writeErrorPage(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
 	fmt.Fprintf(w, errorHTML, message)
 }
 
+// HandleOAuthCallback returns an http.HandlerFunc that handles OAuth2 provider callbacks, exchanges the authorization code for a token, and stores that token keyed by account name.
+//
+// The handler validates the callback `state` to extract an account name, verifies the account is configured, and exchanges the `code` for an OAuth2 token. If `httpClient` is non-nil it is used for the token exchange. On success the token is saved into `tokenStore` under the account name and an HTML success page is written; on failure an error page with an appropriate HTTP status is returned.
 func HandleOAuthCallback(tokenStore storage.TokenStore, httpClient *http.Client) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

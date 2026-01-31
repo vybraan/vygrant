@@ -29,6 +29,15 @@ type Daemon struct {
 	HTTPClient *http.Client
 }
 
+// NewDaemon creates a Daemon by loading configuration and initializing token storage.
+// 
+// It loads configuration from the path specified by the VYGRANT_CONFIG environment
+// variable or from the default user config path (~/.config/vybr/vygrant.toml). If
+// configuration loading fails, an error is returned. The function populates
+// auth.LoadedAccounts from the loaded configuration and selects the token store:
+// a file-based store at ~/.vybr/vygrant/tokens.json when cfg.PersistTokens is
+// true, or an in-memory store otherwise. The returned Daemon has Config and
+// TokenStore initialized.
 func NewDaemon() (*Daemon, error) {
 	confPath := os.Getenv("VYGRANT_CONFIG")
 	if confPath == "" {
@@ -196,11 +205,18 @@ func (d *Daemon) handle(conn net.Conn) {
 	}
 }
 
+// isListenerEnabled reports whether the given listener port string enables a listener.
+// It treats an empty string or the values "none", "off", and "disabled" (case-insensitive, with surrounding whitespace ignored) as disabled; all other values are considered enabled.
 func isListenerEnabled(port string) bool {
 	trimmed := strings.TrimSpace(strings.ToLower(port))
 	return trimmed != "" && trimmed != "none" && trimmed != "off" && trimmed != "disabled"
 }
 
+// ensureSocketAvailable verifies the application's UNIX socket path is usable and returns it.
+//
+// It returns an error if the socket path cannot be determined, if the path exists but is not a UNIX socket,
+// or if another process is already listening on the socket. If a stale socket file exists and is removable,
+// it removes that file and returns the path.
 func ensureSocketAvailable() (string, error) {
 	socketPath := SocketPath()
 	if socketPath == "" {
