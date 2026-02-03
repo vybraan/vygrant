@@ -68,8 +68,12 @@ func FormatPublicKeyFromKey(priv *ecdsa.PrivateKey) string {
 func ensureCA(certPath, keyPath string) (*x509.Certificate, *ecdsa.PrivateKey, error) {
 	cert, key, err := loadCertAndKey(certPath, keyPath)
 	if err == nil && cert.IsCA {
-		_ = ensureFilePermissions(certPath, 0o600)
-		_ = ensureFilePermissions(keyPath, 0o600)
+		if err := ensureFilePermissions(certPath, 0o600); err != nil {
+			return nil, nil, err
+		}
+		if err := ensureFilePermissions(keyPath, 0o600); err != nil {
+			return nil, nil, err
+		}
 		return cert, key, nil
 	}
 
@@ -125,8 +129,12 @@ func ensureLeaf(certPath, keyPath string, caCert *x509.Certificate, caKey *ecdsa
 			if err == nil && leaf.NotAfter.After(time.Now().Add(renewWindow)) && hasLocalhostSANs(leaf) {
 				priv, err := loadECPrivateKeyFromPEM(keyPEM)
 				if err == nil {
-					_ = ensureFilePermissions(certPath, 0o600)
-					_ = ensureFilePermissions(keyPath, 0o600)
+					if err := ensureFilePermissions(certPath, 0o600); err != nil {
+						return tls.Certificate{}, nil, err
+					}
+					if err := ensureFilePermissions(keyPath, 0o600); err != nil {
+						return tls.Certificate{}, nil, err
+					}
 					return cert, priv, nil
 				}
 			}

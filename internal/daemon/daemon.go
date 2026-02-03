@@ -60,6 +60,7 @@ func NewDaemon() (*Daemon, error) {
 			refreshStore := storage.NewKeyringStore("")
 			store = storage.NewSplitStore(refreshStore)
 		} else {
+			log.Println("warning: token persistence unavailable; falling back to in-memory token store")
 			store = storage.NewMemoryStore()
 		}
 	} else {

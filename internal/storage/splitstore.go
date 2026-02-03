@@ -23,12 +23,18 @@ func (s *SplitStore) Get(account string) (*oauth2.Token, error) {
 	var token *oauth2.Token
 
 	accessToken, errAccess := s.access.Get(account)
+	if errAccess != nil && !isNotExist(errAccess) {
+		return nil, errAccess
+	}
 	if errAccess == nil && accessToken != nil {
 		copyToken := *accessToken
 		token = &copyToken
 	}
 
 	refreshToken, errRefresh := s.refresh.Get(account)
+	if errRefresh != nil && !isNotExist(errRefresh) {
+		return nil, errRefresh
+	}
 	if errRefresh == nil && refreshToken != nil && refreshToken.RefreshToken != "" {
 		if token == nil {
 			token = &oauth2.Token{}
