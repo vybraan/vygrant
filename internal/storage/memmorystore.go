@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"errors"
+	"os"
 	"sync"
 
 	"golang.org/x/oauth2"
@@ -31,7 +31,7 @@ func (m *MemoryStore) Get(account string) (*oauth2.Token, error) {
 	defer m.mu.RUnlock()
 	token, exists := m.tokens[account]
 	if !exists {
-		return nil, errors.New("token not found")
+		return nil, os.ErrNotExist
 	}
 	return token, nil
 }
@@ -40,7 +40,7 @@ func (m *MemoryStore) Delete(account string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if _, exists := m.tokens[account]; !exists {
-		return errors.New("token not found")
+		return os.ErrNotExist
 	}
 	delete(m.tokens, account)
 	return nil

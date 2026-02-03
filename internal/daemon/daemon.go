@@ -30,13 +30,14 @@ type Daemon struct {
 }
 
 // NewDaemon creates a Daemon by loading configuration and initializing token storage.
-// 
+//
 // It loads configuration from the path specified by the VYGRANT_CONFIG environment
 // variable or from the default user config path (~/.config/vybr/vygrant.toml). If
 // configuration loading fails, an error is returned. The function populates
 // auth.LoadedAccounts from the loaded configuration and selects the token store:
-// a file-based store at ~/.vybr/vygrant/tokens.json when cfg.PersistTokens is
-// true, or an in-memory store otherwise. The returned Daemon has Config and
+// when cfg.PersistTokens is true it prefers the OS keyring for refresh tokens (with
+// an in-memory access-token cache). When cfg.PersistTokens is false, or when a keyring
+// is unavailable, it uses an in-memory store only. The returned Daemon has Config and
 // TokenStore initialized.
 func NewDaemon() (*Daemon, error) {
 	confPath := os.Getenv("VYGRANT_CONFIG")
@@ -55,9 +56,12 @@ func NewDaemon() (*Daemon, error) {
 	var store storage.TokenStore
 
 	if cfg.PersistTokens {
-		home, _ := os.UserHomeDir()
-		storePath := path.Join(home, ".vybr/vygrant/tokens.json")
-		store = storage.NewFileStore(storePath)
+		if storage.KeyringAvailable("") {
+			refreshStore := storage.NewKeyringStore("")
+			store = storage.NewSplitStore(refreshStore)
+		} else {
+			store = storage.NewMemoryStore()
+		}
 	} else {
 		store = storage.NewMemoryStore()
 	}
