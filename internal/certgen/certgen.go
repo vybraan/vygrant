@@ -68,6 +68,12 @@ func FormatPublicKeyFromKey(priv *ecdsa.PrivateKey) string {
 func ensureCA(certPath, keyPath string) (*x509.Certificate, *ecdsa.PrivateKey, error) {
 	cert, key, err := loadCertAndKey(certPath, keyPath)
 	if err == nil && cert.IsCA {
+		if err := ensureFilePermissions(certPath, 0o600); err != nil {
+			return nil, nil, err
+		}
+		if err := ensureFilePermissions(keyPath, 0o600); err != nil {
+			return nil, nil, err
+		}
 		return cert, key, nil
 	}
 
@@ -99,7 +105,7 @@ func ensureCA(certPath, keyPath string) (*x509.Certificate, *ecdsa.PrivateKey, e
 	keyBytes, _ := x509.MarshalECPrivateKey(priv)
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyBytes})
 
-	if err := writeFile(certPath, certPEM, 0o644); err != nil {
+	if err := writeFile(certPath, certPEM, 0o600); err != nil {
 		return nil, nil, err
 	}
 	if err := writeFile(keyPath, keyPEM, 0o600); err != nil {
@@ -114,7 +120,7 @@ func ensureCA(certPath, keyPath string) (*x509.Certificate, *ecdsa.PrivateKey, e
 }
 
 func ensureLeaf(certPath, keyPath string, caCert *x509.Certificate, caKey *ecdsa.PrivateKey) (tls.Certificate, *ecdsa.PrivateKey, error) {
-	const renewWindow = 30 * 24 * time.Hour
+	const renewWindow = 14 * 24 * time.Hour
 	certPEM, keyPEM, err := loadPEMFiles(certPath, keyPath)
 	if err == nil {
 		cert, err := tls.X509KeyPair(certPEM, keyPEM)
@@ -123,6 +129,12 @@ func ensureLeaf(certPath, keyPath string, caCert *x509.Certificate, caKey *ecdsa
 			if err == nil && leaf.NotAfter.After(time.Now().Add(renewWindow)) && hasLocalhostSANs(leaf) {
 				priv, err := loadECPrivateKeyFromPEM(keyPEM)
 				if err == nil {
+					if err := ensureFilePermissions(certPath, 0o600); err != nil {
+						return tls.Certificate{}, nil, err
+					}
+					if err := ensureFilePermissions(keyPath, 0o600); err != nil {
+						return tls.Certificate{}, nil, err
+					}
 					return cert, priv, nil
 				}
 			}
@@ -141,7 +153,7 @@ func ensureLeaf(certPath, keyPath string, caCert *x509.Certificate, caKey *ecdsa
 			CommonName: "localhost",
 		},
 		NotBefore:             time.Now().Add(-1 * time.Hour),
-		NotAfter:              time.Now().Add(10 * 365 * 24 * time.Hour),
+		NotAfter:              time.Now().Add(90 * 24 * time.Hour),
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
@@ -158,7 +170,7 @@ func ensureLeaf(certPath, keyPath string, caCert *x509.Certificate, caKey *ecdsa
 	keyBytes, _ := x509.MarshalECPrivateKey(priv)
 	keyPEM = pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyBytes})
 
-	if err := writeFile(certPath, certPEM, 0o644); err != nil {
+	if err := writeFile(certPath, certPEM, 0o600); err != nil {
 		return tls.Certificate{}, nil, err
 	}
 	if err := writeFile(keyPath, keyPEM, 0o600); err != nil {
@@ -240,6 +252,17 @@ func hasLocalhostSANs(cert *x509.Certificate) bool {
 func writeFile(path string, data []byte, perm os.FileMode) error {
 	if err := os.WriteFile(path, data, perm); err != nil {
 		return err
+	}
+	return nil
+}
+
+func ensureFilePermissions(path string, perm os.FileMode) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if info.Mode().Perm() != perm {
+		return os.Chmod(path, perm)
 	}
 	return nil
 }
