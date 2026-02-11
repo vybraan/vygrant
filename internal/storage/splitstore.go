@@ -107,6 +107,10 @@ func (s *SplitStore) ListAccounts() []string {
 	return accounts
 }
 
+func (s *SplitStore) RefreshStore() TokenStore {
+	return s.refresh
+}
+
 func isNotExist(err error) bool {
 	return errors.Is(err, os.ErrNotExist)
 }

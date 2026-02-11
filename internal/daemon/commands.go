@@ -7,6 +7,8 @@ import (
 	"path"
 	"strings"
 	"time"
+
+	"github.com/vybraan/vygrant/internal/storage"
 )
 
 func (d *Daemon) HandleCommand(conn net.Conn, input string) {
@@ -50,10 +52,12 @@ func (d *Daemon) HandleCommand(conn net.Conn, input string) {
 		if !isListenerEnabled(d.Config.HTTPSListen) {
 			publicKey = "disabled"
 		}
+		tokenBackend := tokenBackendDescription(d.TokenStore)
 		info := fmt.Sprintf(
-			"Socket path: %s\nConfig file: %s\nServer running on:\n  HTTP Port: %s\n  HTTPS Port: %s\nHTTPS public key: %s",
+			"Socket path: %s\nConfig file: %s\nToken storage: %s\nServer running on:\n  HTTP Port: %s\n  HTTPS Port: %s\nHTTPS public key: %s",
 			SocketPath(),
 			path.Join(home, VYGRANT_CONFIG),
+			tokenBackend,
 			d.Config.HTTPListen,
 			d.Config.HTTPSListen,
 			publicKey,
@@ -158,6 +162,24 @@ func (d *Daemon) authURL(account string) string {
 		port = d.Config.HTTPSListen
 	}
 	return fmt.Sprintf("%s://localhost:%s/auth?account=%s", scheme, port, account)
+}
+
+func tokenBackendDescription(store storage.TokenStore) string {
+	switch typed := store.(type) {
+	case *storage.SplitStore:
+		switch typed.RefreshStore().(type) {
+		case *storage.KeyringStore:
+			return "split (access: memory, refresh: keyring)"
+		default:
+			return "split (access: memory)"
+		}
+	case *storage.KeyringStore:
+		return "keyring"
+	case *storage.MemoryStore:
+		return "memory"
+	default:
+		return "unknown"
+	}
 }
 
 func expectArgs(conn net.Conn, parts []string, expected int, usage string) bool {
