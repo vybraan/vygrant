@@ -7,7 +7,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.2
 	github.com/spf13/cobra v1.9.1
 	github.com/zalando/go-keyring v0.2.3
-	golang.org/x/oauth2 v0.30.0
+	golang.org/x/oauth2 v0.35.0
 )
 
 require (
