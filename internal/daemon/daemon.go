@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/vybraan/vygrant/internal/api"
 	"github.com/vybraan/vygrant/internal/auth"
@@ -54,14 +55,27 @@ func NewDaemon() (*Daemon, error) {
 	auth.LoadedAccounts = cfg.Accounts
 
 	var store storage.TokenStore
+	home, _ := os.UserHomeDir()
+	legacyTokenPath := path.Join(home, ".vybr/vygrant/tokens.json")
 
 	if cfg.PersistTokens {
 		if storage.KeyringAvailable("") {
 			refreshStore := storage.NewKeyringStore("")
-			store = storage.NewSplitStore(refreshStore)
+			splitStore := storage.NewSplitStore(refreshStore)
+			if migrated, backupPath, err := migrateLegacyTokens(legacyTokenPath, splitStore); err != nil {
+				log.Printf("warning: failed to migrate legacy tokens: %v", err)
+			} else if migrated {
+				log.Printf("migrated legacy tokens to keyring; backed up file to %s", backupPath)
+			}
+			store = splitStore
 		} else {
-			log.Println("warning: token persistence unavailable; falling back to in-memory token store")
-			store = storage.NewMemoryStore()
+			if fileExists(legacyTokenPath) {
+				log.Println("warning: keyring unavailable; using legacy file token store")
+				store = storage.NewFileStore(legacyTokenPath)
+			} else {
+				log.Println("warning: token persistence unavailable; falling back to in-memory token store")
+				store = storage.NewMemoryStore()
+			}
 		}
 	} else {
 		store = storage.NewMemoryStore()
@@ -245,4 +259,49 @@ func ensureSocketAvailable() (string, error) {
 	}
 
 	return socketPath, nil
+}
+
+func migrateLegacyTokens(path string, store storage.TokenStore) (bool, string, error) {
+	if !fileExists(path) {
+		return false, "", nil
+	}
+
+	legacyStore := storage.NewFileStore(path)
+	accounts := legacyStore.ListAccounts()
+	if len(accounts) == 0 {
+		return false, "", nil
+	}
+
+	for _, account := range accounts {
+		token, err := legacyStore.Get(account)
+		if err != nil {
+			continue
+		}
+		if token == nil {
+			continue
+		}
+		if token.AccessToken == "" && token.RefreshToken == "" {
+			continue
+		}
+		if err := store.Set(account, token); err != nil {
+			return false, "", err
+		}
+	}
+
+	backupPath := path + ".bak"
+	if fileExists(backupPath) {
+		backupPath = fmt.Sprintf("%s.%d", backupPath, time.Now().Unix())
+	}
+	if err := os.Rename(path, backupPath); err != nil {
+		return false, "", err
+	}
+
+	return true, backupPath, nil
+}
+
+func fileExists(path string) bool {
+	if _, err := os.Stat(path); err == nil {
+		return true
+	}
+	return false
 }

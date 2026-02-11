@@ -68,7 +68,13 @@ scopes = ["openid", "profile", "email"]
 
 - `https_listen`: Port for HTTPS callbacks (default `8080`).
 - `http_listen`: Port for HTTP callbacks (default disabled). Use this with `redirect_uri = "http://localhost:<port>"` if your browser blocks the self-signed HTTPS callback.
-- `persist_tokens`: Whether to save tokens to disk (default `true`).
+- `persist_tokens`: Whether to persist refresh tokens (default `true`). When enabled, vygrant prefers the OS keyring; access tokens stay in memory.
+
+#### Token persistence and migration
+
+- If a legacy `~/.vybr/vygrant/tokens.json` exists and the keyring is available, vygrant migrates refresh tokens to the keyring on first run and renames the old file to `tokens.json.bak`.
+- If the keyring is unavailable but a legacy `tokens.json` exists, vygrant uses that file store with a warning (legacy compatibility).
+- If the keyring is unavailable and no legacy file exists, tokens are memory‑only and will be lost on daemon restart.
 
 ###### You may use Thunderbird's OAuth2 client ID/secret for Microsoft accounts, but it's recommended to create your own credentials.
 

@@ -175,6 +175,8 @@ func tokenBackendDescription(store storage.TokenStore) string {
 		}
 	case *storage.KeyringStore:
 		return "keyring"
+	case *storage.FileStore:
+		return "file (legacy)"
 	case *storage.MemoryStore:
 		return "memory"
 	default:
