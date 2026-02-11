@@ -22,6 +22,7 @@ type Config struct {
 	HTTPSListen   string              `toml:"https_listen"`
 	HTTPListen    string              `toml:"http_listen"`
 	PersistTokens bool                `toml:"persist_tokens"`
+	TokenEventCmd string              `toml:"token_event_cmd"`
 	Accounts      map[string]*Account `toml:"account"`
 }
 

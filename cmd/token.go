@@ -46,10 +46,30 @@ var refreshTokenCmd = &cobra.Command{
 	},
 }
 
+var dumpTokenCmd = &cobra.Command{
+	Use:   "dump",
+	Short: "Dump token state to stdout (sensitive)",
+	Long:  "Dumps the current token state to stdout. Treat this output as sensitive and encrypt it.",
+	Run: func(cmd *cobra.Command, args []string) {
+		runClientCommand("dump-tokens")
+	},
+}
+
+var restoreTokenCmd = &cobra.Command{
+	Use:   "restore",
+	Short: "Restore token state from stdin (sensitive)",
+	Long:  "Restores token state from stdin. Treat the input as sensitive.",
+	Run: func(cmd *cobra.Command, args []string) {
+		runClientCommandWithStdin("restore-tokens")
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(tokenCmd)
 
 	tokenCmd.AddCommand(getTokenCmd)
 	tokenCmd.AddCommand(deleteTokenCmd)
 	tokenCmd.AddCommand(refreshTokenCmd)
+	tokenCmd.AddCommand(dumpTokenCmd)
+	tokenCmd.AddCommand(restoreTokenCmd)
 }

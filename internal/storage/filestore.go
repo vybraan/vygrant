@@ -81,3 +81,21 @@ func (fs *FileStore) ListAccounts() []string {
 	}
 	return accounts
 }
+
+func (fs *FileStore) Dump() ([]byte, error) {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	return json.Marshal(fs.tokens)
+}
+
+func (fs *FileStore) Restore(data []byte) error {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	if len(data) == 0 {
+		return nil
+	}
+	if err := json.Unmarshal(data, &fs.tokens); err != nil {
+		return err
+	}
+	return fs.persist()
+}

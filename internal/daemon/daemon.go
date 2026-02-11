@@ -82,6 +82,21 @@ func NewDaemon() (*Daemon, error) {
 				}, nil
 			}
 			store = splitStore
+		} else if storage.PassAvailable() {
+			refreshStore := storage.NewPassStore("")
+			splitStore := storage.NewSplitStore(refreshStore)
+			if migrated, backupPath, err := migrateLegacyTokens(legacyTokenPath, splitStore); err != nil {
+				log.Printf("warning: failed to migrate legacy tokens: %v", err)
+			} else if migrated {
+				log.Printf("migrated legacy tokens to pass store; backed up file to %s", backupPath)
+				store = splitStore
+				return &Daemon{
+					Config:          cfg,
+					TokenStore:      store,
+					LegacyMigration: fmt.Sprintf("migrated legacy file to pass store (backup: %s)", backupPath),
+				}, nil
+			}
+			store = splitStore
 		} else {
 			if fileExists(legacyTokenPath) {
 				log.Println("warning: keyring unavailable; using legacy file token store")
@@ -113,6 +128,10 @@ func (d *Daemon) Start() {
 		},
 	}
 	d.HTTPClient = httpClient
+
+	if d.Config.TokenEventCmd != "" {
+		d.TokenStore = storage.NewEventStore(d.TokenStore, d.Config.TokenEventCmd)
+	}
 
 	go StartBackgroundTasks(d.Config, d.TokenStore, d.HTTPClient, stopCh)
 
@@ -259,7 +278,7 @@ func (d *Daemon) handle(conn net.Conn) {
 	scanner := bufio.NewScanner(conn)
 	for scanner.Scan() {
 		input := scanner.Text()
-		d.HandleCommand(conn, input)
+		d.HandleCommand(conn, input, scanner)
 	}
 }
 

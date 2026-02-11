@@ -1,11 +1,9 @@
 package storage
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"os"
-	"strings"
 
 	"github.com/zalando/go-keyring"
 	"golang.org/x/oauth2"
@@ -14,7 +12,6 @@ import (
 const (
 	defaultKeyringService = "vygrant"
 	accountIndexKey       = "vygrant-account-index"
-	keyringSecretPrefix   = "v1:"
 	maxKeyringSecretLen   = 2500
 )
 
@@ -53,49 +50,24 @@ func (k *KeyringStore) Get(account string) (*oauth2.Token, error) {
 		return nil, err
 	}
 
-	if strings.HasPrefix(secret, keyringSecretPrefix) {
-		decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(secret, keyringSecretPrefix))
-		if err != nil {
-			return nil, err
-		}
-		var entry keyringTokenEntry
-		if err := json.Unmarshal(decoded, &entry); err != nil {
-			return nil, err
-		}
-		if entry.RefreshToken == "" {
+	token, err := DecodeTokenSecret(secret)
+	if err != nil {
+		if err.Error() == "empty secret" || err.Error() == "empty refresh token" {
 			return nil, os.ErrNotExist
 		}
-		return &oauth2.Token{RefreshToken: entry.RefreshToken}, nil
+		return nil, err
 	}
-
-	if secret == "" {
-		return nil, os.ErrNotExist
-	}
-
-	trimmed := strings.TrimSpace(secret)
-	if strings.HasPrefix(trimmed, "{") {
-		var entry keyringTokenEntry
-		if err := json.Unmarshal([]byte(secret), &entry); err != nil {
-			return nil, err
-		}
-		if entry.RefreshToken == "" {
-			return nil, os.ErrNotExist
-		}
-		return &oauth2.Token{RefreshToken: entry.RefreshToken}, nil
-	}
-
-	return &oauth2.Token{RefreshToken: secret}, nil
+	return token, nil
 }
 
 func (k *KeyringStore) Set(account string, token *oauth2.Token) error {
 	if token == nil || token.RefreshToken == "" {
 		return nil
 	}
-	data, err := json.Marshal(keyringTokenEntry{RefreshToken: token.RefreshToken})
+	encoded, err := EncodeTokenSecret(token)
 	if err != nil {
 		return err
 	}
-	encoded := keyringSecretPrefix + base64.StdEncoding.EncodeToString(data)
 	if len(encoded) > maxKeyringSecretLen {
 		return errors.New("keyring entry exceeds platform limit")
 	}
@@ -191,6 +163,41 @@ func (k *KeyringStore) removeAccountFromIndex(account string) error {
 		}
 	}
 	return k.writeAccountIndex(filtered)
+}
+
+func (k *KeyringStore) Dump() ([]byte, error) {
+	accounts := k.ListAccounts()
+	dump := make(map[string]*oauth2.Token, len(accounts))
+	for _, account := range accounts {
+		token, err := k.Get(account)
+		if err != nil {
+			continue
+		}
+		if token != nil {
+			copyToken := *token
+			dump[account] = &copyToken
+		}
+	}
+	return json.Marshal(dump)
+}
+
+func (k *KeyringStore) Restore(data []byte) error {
+	if len(data) == 0 {
+		return nil
+	}
+	var dump map[string]*oauth2.Token
+	if err := json.Unmarshal(data, &dump); err != nil {
+		return err
+	}
+	for account, token := range dump {
+		if token == nil {
+			continue
+		}
+		if err := k.Set(account, token); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func uniqueAccounts(accounts []string) []string {

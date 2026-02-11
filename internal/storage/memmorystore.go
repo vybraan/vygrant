@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"encoding/json"
 	"os"
 	"sync"
 
@@ -54,4 +55,19 @@ func (m *MemoryStore) ListAccounts() []string {
 		accounts = append(accounts, acc)
 	}
 	return accounts
+}
+
+func (m *MemoryStore) Dump() ([]byte, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return json.Marshal(m.tokens)
+}
+
+func (m *MemoryStore) Restore(data []byte) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(data) == 0 {
+		return nil
+	}
+	return json.Unmarshal(data, &m.tokens)
 }

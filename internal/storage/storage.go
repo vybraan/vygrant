@@ -8,3 +8,8 @@ type TokenStore interface {
 	Delete(account string) error
 	ListAccounts() []string
 }
+
+type TokenDumper interface {
+	Dump() ([]byte, error)
+	Restore(data []byte) error
+}

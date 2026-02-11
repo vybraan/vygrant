@@ -1,7 +1,10 @@
 package daemon
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path"
@@ -11,7 +14,7 @@ import (
 	"github.com/vybraan/vygrant/internal/storage"
 )
 
-func (d *Daemon) HandleCommand(conn net.Conn, input string) {
+func (d *Daemon) HandleCommand(conn net.Conn, input string, scanner *bufio.Scanner) {
 	parts := strings.Fields(input)
 	if len(parts) == 0 {
 		writeError(conn, "No command provided")
@@ -137,6 +140,34 @@ func (d *Daemon) HandleCommand(conn net.Conn, input string) {
 		d.TokenStore.Set(account, newToken)
 		Notify("vygrant - token refreshed", fmt.Sprintf("Token for '%s' successfully refreshed.", account))
 		writeResponse(conn, "Token for '%s' refreshed", account)
+	case "dump-tokens":
+		dumper, ok := d.TokenStore.(storage.TokenDumper)
+		if !ok {
+			writeError(conn, "Token store does not support dump")
+			return
+		}
+		data, err := dumper.Dump()
+		if err != nil {
+			writeError(conn, "Failed to dump tokens: %v", err)
+			return
+		}
+		conn.Write(data)
+	case "restore-tokens":
+		dumper, ok := d.TokenStore.(storage.TokenDumper)
+		if !ok {
+			writeError(conn, "Token store does not support restore")
+			return
+		}
+		payload, err := readPayload(scanner)
+		if err != nil {
+			writeError(conn, "Failed to read payload: %v", err)
+			return
+		}
+		if err := dumper.Restore(payload); err != nil {
+			writeError(conn, "Failed to restore tokens: %v", err)
+			return
+		}
+		writeResponse(conn, "Tokens restored")
 
 	default:
 		writeError(conn, "Unknown command '%s'", parts[0])
@@ -175,11 +206,17 @@ func tokenBackendDescription(store storage.TokenStore) string {
 		switch typed.RefreshStore().(type) {
 		case *storage.KeyringStore:
 			return "split (access: memory, refresh: keyring)"
+		case *storage.PassStore:
+			return "split (access: memory, refresh: pass)"
 		default:
 			return "split (access: memory)"
 		}
+	case *storage.EventStore:
+		return tokenBackendDescription(typed.Inner())
 	case *storage.KeyringStore:
 		return "keyring"
+	case *storage.PassStore:
+		return "pass"
 	case *storage.FileStore:
 		return "file (legacy)"
 	case *storage.MemoryStore:
@@ -187,6 +224,26 @@ func tokenBackendDescription(store storage.TokenStore) string {
 	default:
 		return "unknown"
 	}
+}
+
+func readPayload(scanner *bufio.Scanner) ([]byte, error) {
+	var buf strings.Builder
+	for scanner.Scan() {
+		buf.WriteString(scanner.Text())
+		buf.WriteByte('\n')
+	}
+	if err := scanner.Err(); err != nil && err != io.EOF {
+		return nil, err
+	}
+	raw := strings.TrimSpace(buf.String())
+	if raw == "" {
+		return []byte{}, nil
+	}
+	var normalized json.RawMessage
+	if err := json.Unmarshal([]byte(raw), &normalized); err != nil {
+		return nil, err
+	}
+	return normalized, nil
 }
 
 func expectArgs(conn net.Conn, parts []string, expected int, usage string) bool {

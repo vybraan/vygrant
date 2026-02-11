@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"strings"
@@ -31,4 +32,30 @@ func SendCommand(command string) (string, error) {
 	}
 
 	return strings.TrimSpace(string(buf[:n])), nil
+}
+
+func SendCommandWithPayload(command string, payload []byte) (string, error) {
+	conn, err := net.Dial("unix", daemon.SocketPath())
+	if err != nil {
+		return "", fmt.Errorf("failed to connect to daemon: %w", err)
+	}
+	defer conn.Close()
+
+	var buf bytes.Buffer
+	buf.WriteString(command)
+	buf.WriteByte('\n')
+	if len(payload) > 0 {
+		buf.Write(payload)
+	}
+
+	if _, err := conn.Write(buf.Bytes()); err != nil {
+		return "", fmt.Errorf("failed to send command: %w", err)
+	}
+
+	resp := make([]byte, 8192)
+	n, err := conn.Read(resp)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %w", err)
+	}
+	return strings.TrimSpace(string(resp[:n])), nil
 }

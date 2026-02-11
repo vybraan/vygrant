@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 
@@ -113,4 +114,55 @@ func (s *SplitStore) RefreshStore() TokenStore {
 
 func isNotExist(err error) bool {
 	return errors.Is(err, os.ErrNotExist)
+}
+
+func (s *SplitStore) Dump() ([]byte, error) {
+	type dumpEntry struct {
+		Access  *oauth2.Token `json:"access,omitempty"`
+		Refresh *oauth2.Token `json:"refresh,omitempty"`
+	}
+	dump := map[string]dumpEntry{}
+	accounts := s.ListAccounts()
+	for _, account := range accounts {
+		entry := dumpEntry{}
+		if token, err := s.access.Get(account); err == nil {
+			copyToken := *token
+			entry.Access = &copyToken
+		}
+		if token, err := s.refresh.Get(account); err == nil {
+			copyToken := *token
+			entry.Refresh = &copyToken
+		}
+		if entry.Access != nil || entry.Refresh != nil {
+			dump[account] = entry
+		}
+	}
+	return json.Marshal(dump)
+}
+
+func (s *SplitStore) Restore(data []byte) error {
+	type dumpEntry struct {
+		Access  *oauth2.Token `json:"access,omitempty"`
+		Refresh *oauth2.Token `json:"refresh,omitempty"`
+	}
+	if len(data) == 0 {
+		return nil
+	}
+	var dump map[string]dumpEntry
+	if err := json.Unmarshal(data, &dump); err != nil {
+		return err
+	}
+	for account, entry := range dump {
+		if entry.Access != nil {
+			if err := s.access.Set(account, entry.Access); err != nil {
+				return err
+			}
+		}
+		if entry.Refresh != nil {
+			if err := s.refresh.Set(account, entry.Refresh); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
