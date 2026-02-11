@@ -1,9 +1,11 @@
 package storage
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"os"
+	"strings"
 
 	"github.com/zalando/go-keyring"
 	"golang.org/x/oauth2"
@@ -12,6 +14,8 @@ import (
 const (
 	defaultKeyringService = "vygrant"
 	accountIndexKey       = "vygrant-account-index"
+	keyringSecretPrefix   = "v1:"
+	maxKeyringSecretLen   = 2500
 )
 
 type KeyringStore struct {
@@ -49,8 +53,15 @@ func (k *KeyringStore) Get(account string) (*oauth2.Token, error) {
 		return nil, err
 	}
 
-	var entry keyringTokenEntry
-	if err := json.Unmarshal([]byte(secret), &entry); err == nil {
+	if strings.HasPrefix(secret, keyringSecretPrefix) {
+		decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(secret, keyringSecretPrefix))
+		if err != nil {
+			return nil, err
+		}
+		var entry keyringTokenEntry
+		if err := json.Unmarshal(decoded, &entry); err != nil {
+			return nil, err
+		}
 		if entry.RefreshToken == "" {
 			return nil, os.ErrNotExist
 		}
@@ -60,6 +71,19 @@ func (k *KeyringStore) Get(account string) (*oauth2.Token, error) {
 	if secret == "" {
 		return nil, os.ErrNotExist
 	}
+
+	trimmed := strings.TrimSpace(secret)
+	if strings.HasPrefix(trimmed, "{") {
+		var entry keyringTokenEntry
+		if err := json.Unmarshal([]byte(secret), &entry); err != nil {
+			return nil, err
+		}
+		if entry.RefreshToken == "" {
+			return nil, os.ErrNotExist
+		}
+		return &oauth2.Token{RefreshToken: entry.RefreshToken}, nil
+	}
+
 	return &oauth2.Token{RefreshToken: secret}, nil
 }
 
@@ -71,7 +95,11 @@ func (k *KeyringStore) Set(account string, token *oauth2.Token) error {
 	if err != nil {
 		return err
 	}
-	if err := keyring.Set(k.service, account, string(data)); err != nil {
+	encoded := keyringSecretPrefix + base64.StdEncoding.EncodeToString(data)
+	if len(encoded) > maxKeyringSecretLen {
+		return errors.New("keyring entry exceeds platform limit")
+	}
+	if err := keyring.Set(k.service, account, encoded); err != nil {
 		return err
 	}
 	return k.addAccountToIndex(account)

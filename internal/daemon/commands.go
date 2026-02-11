@@ -53,11 +53,16 @@ func (d *Daemon) HandleCommand(conn net.Conn, input string) {
 			publicKey = "disabled"
 		}
 		tokenBackend := tokenBackendDescription(d.TokenStore)
+		migrationLine := ""
+		if d.LegacyMigration != "" {
+			migrationLine = fmt.Sprintf("\nLegacy migration: %s", d.LegacyMigration)
+		}
 		info := fmt.Sprintf(
-			"Socket path: %s\nConfig file: %s\nToken storage: %s\nServer running on:\n  HTTP Port: %s\n  HTTPS Port: %s\nHTTPS public key: %s",
+			"Socket path: %s\nConfig file: %s\nToken storage: %s%s\nServer running on:\n  HTTP Port: %s\n  HTTPS Port: %s\nHTTPS public key: %s",
 			SocketPath(),
 			path.Join(home, VYGRANT_CONFIG),
 			tokenBackend,
+			migrationLine,
 			d.Config.HTTPListen,
 			d.Config.HTTPSListen,
 			publicKey,

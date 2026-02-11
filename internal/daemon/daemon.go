@@ -2,14 +2,18 @@ package daemon
 
 import (
 	"bufio"
+	"context"
 	"crypto/tls"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
+	"os/signal"
 	"path"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/vybraan/vygrant/internal/api"
@@ -24,10 +28,11 @@ const (
 )
 
 type Daemon struct {
-	Config     *config.Config
-	TokenStore storage.TokenStore
-	PublicKey  string
-	HTTPClient *http.Client
+	Config          *config.Config
+	TokenStore      storage.TokenStore
+	PublicKey       string
+	HTTPClient      *http.Client
+	LegacyMigration string
 }
 
 // NewDaemon creates a Daemon by loading configuration and initializing token storage.
@@ -51,6 +56,9 @@ func NewDaemon() (*Daemon, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := validateConfig(cfg); err != nil {
+		return nil, err
+	}
 
 	auth.LoadedAccounts = cfg.Accounts
 
@@ -66,6 +74,12 @@ func NewDaemon() (*Daemon, error) {
 				log.Printf("warning: failed to migrate legacy tokens: %v", err)
 			} else if migrated {
 				log.Printf("migrated legacy tokens to keyring; backed up file to %s", backupPath)
+				store = splitStore
+				return &Daemon{
+					Config:          cfg,
+					TokenStore:      store,
+					LegacyMigration: fmt.Sprintf("migrated legacy file to keyring (backup: %s)", backupPath),
+				}, nil
 			}
 			store = splitStore
 		} else {
@@ -88,8 +102,10 @@ func NewDaemon() (*Daemon, error) {
 }
 
 func (d *Daemon) Start() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	stopCh := make(chan struct{})
-	defer close(stopCh)
 
 	httpClient := &http.Client{
 		Transport: &http.Transport{
@@ -170,23 +186,16 @@ func (d *Daemon) Start() {
 	}()
 	go d.handleConnections(socketListener)
 
+	errCh := make(chan error, 2)
+
+	var httpServer *http.Server
 	if httpEnabled {
-		httpServer := &http.Server{
-			Handler: handler,
-		}
-		if httpsEnabled {
-			go func() {
-				if err := httpServer.Serve(httpListener); err != nil {
-					log.Fatalf("http server crashed: %v", err)
-				}
-			}()
-		} else {
-			log.Println("oauth2 daemon is running (http only)")
-			if err := httpServer.Serve(httpListener); err != nil {
-				log.Fatalf("server crashed: %v", err)
+		httpServer = &http.Server{Handler: handler}
+		go func() {
+			if err := httpServer.Serve(httpListener); err != nil && err != http.ErrServerClosed {
+				errCh <- fmt.Errorf("http server crashed: %w", err)
 			}
-			return
-		}
+		}()
 	}
 
 	httpsServer := &http.Server{
@@ -197,10 +206,40 @@ func (d *Daemon) Start() {
 		},
 	}
 
-	log.Println("oauth2 daemon is running")
-	tlsListener := tls.NewListener(httpsListener, httpsServer.TLSConfig)
-	if err := httpsServer.Serve(tlsListener); err != nil {
-		log.Fatalf("https server crashed: %v", err)
+	if httpsEnabled {
+		log.Println("oauth2 daemon is running")
+		tlsListener := tls.NewListener(httpsListener, httpsServer.TLSConfig)
+		go func() {
+			if err := httpsServer.Serve(tlsListener); err != nil && err != http.ErrServerClosed {
+				errCh <- fmt.Errorf("https server crashed: %w", err)
+			}
+		}()
+	} else {
+		log.Println("oauth2 daemon is running (http only)")
+	}
+
+	select {
+	case err := <-errCh:
+		log.Fatal(err)
+	case <-ctx.Done():
+		log.Println("shutting down daemon")
+	}
+
+	close(stopCh)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if httpServer != nil {
+		_ = httpServer.Shutdown(shutdownCtx)
+	}
+	if httpsEnabled {
+		_ = httpsServer.Shutdown(shutdownCtx)
+	}
+	if httpListener != nil {
+		_ = httpListener.Close()
+	}
+	if httpsListener != nil {
+		_ = httpsListener.Close()
 	}
 }
 
@@ -304,4 +343,64 @@ func fileExists(path string) bool {
 		return true
 	}
 	return false
+}
+
+func validateConfig(cfg *config.Config) error {
+	if cfg == nil {
+		return fmt.Errorf("config is nil")
+	}
+	if len(cfg.Accounts) == 0 {
+		return nil
+	}
+
+	httpsEnabled := isListenerEnabled(cfg.HTTPSListen)
+	httpEnabled := isListenerEnabled(cfg.HTTPListen)
+
+	for name, acct := range cfg.Accounts {
+		if acct == nil {
+			return fmt.Errorf("account %q is nil", name)
+		}
+		if acct.AuthURI == "" || acct.TokenURI == "" || acct.RedirectURI == "" || acct.ClientID == "" {
+			return fmt.Errorf("account %q is missing required fields", name)
+		}
+		if err := validateURL(acct.AuthURI, "auth_uri", name); err != nil {
+			return err
+		}
+		if err := validateURL(acct.TokenURI, "token_uri", name); err != nil {
+			return err
+		}
+		if err := validateURL(acct.RedirectURI, "redirect_uri", name); err != nil {
+			return err
+		}
+
+		redirectURL, _ := url.Parse(acct.RedirectURI)
+		switch redirectURL.Scheme {
+		case "https":
+			if !httpsEnabled {
+				return fmt.Errorf("account %q redirect_uri is https but https_listen is disabled", name)
+			}
+		case "http":
+			if !httpEnabled {
+				return fmt.Errorf("account %q redirect_uri is http but http_listen is disabled", name)
+			}
+		default:
+			return fmt.Errorf("account %q redirect_uri must be http or https", name)
+		}
+	}
+
+	return nil
+}
+
+func validateURL(rawURL, field, account string) error {
+	parsed, err := url.ParseRequestURI(rawURL)
+	if err != nil {
+		return fmt.Errorf("account %q has invalid %s: %v", account, field, err)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf("account %q %s must be http or https", account, field)
+	}
+	if parsed.Host == "" {
+		return fmt.Errorf("account %q %s missing host", account, field)
+	}
+	return nil
 }
