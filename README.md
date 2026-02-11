@@ -69,12 +69,25 @@ scopes = ["openid", "profile", "email"]
 - `https_listen`: Port for HTTPS callbacks (default `8080`).
 - `http_listen`: Port for HTTP callbacks (default disabled). Use this with `redirect_uri = "http://localhost:<port>"` if your browser blocks the self-signed HTTPS callback.
 - `persist_tokens`: Whether to persist refresh tokens (default `true`). When enabled, vygrant prefers the OS keyring; access tokens stay in memory.
+- `token_event_cmd`: Optional shell command to run whenever tokens change (set/delete/restore). `VYGRANT_ACCOUNT` and `VYGRANT_EVENT` are exported.
 
 #### Token persistence and migration
 
 - If a legacy `~/.vybr/vygrant/tokens.json` exists and the keyring is available, vygrant migrates refresh tokens to the keyring on first run and renames the old file to `tokens.json.bak`.
 - If the keyring is unavailable but a legacy `tokens.json` exists, vygrant uses that file store with a warning (legacy compatibility).
 - If the keyring is unavailable and no legacy file exists, tokens are memory‑only and will be lost on daemon restart.
+- If the keyring is unavailable and `pass` is installed, vygrant uses `pass` as the refresh-token store (access tokens remain in memory).
+
+#### Exporting and restoring tokens (advanced)
+
+You can export the current token state and re-import it later:
+
+```bash
+vygrant token dump > tokens.json
+cat tokens.json | vygrant token restore
+```
+
+The dump contains secrets; store it encrypted (e.g., `age`, `gpg`). When `token_event_cmd` is set, you can automate this export on changes.
 
 ###### You may use Thunderbird's OAuth2 client ID/secret for Microsoft accounts, but it's recommended to create your own credentials.
 
