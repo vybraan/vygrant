@@ -3,7 +3,7 @@ module github.com/vybraan/vygrant
 go 1.24.5
 
 require (
-	github.com/BurntSushi/toml v1.5.0
+	github.com/BurntSushi/toml v1.6.0
 	github.com/go-chi/chi/v5 v5.2.2
 	github.com/spf13/cobra v1.9.1
 	github.com/zalando/go-keyring v0.2.3
