@@ -126,8 +126,7 @@ PanelWindow {
             Repeater {
               model: [
                 { label: "Overview", icon: "home", index: 0 },
-                { label: "Accounts", icon: "group", index: 1 },
-                { label: "Tokens", icon: "key", index: 2 }
+                { label: "Tokens", icon: "key", index: 1 }
               ]
 
               delegate: Rectangle {
@@ -407,12 +406,72 @@ PanelWindow {
               }
             }
 
-            // Accounts
+            // Tokens
             RowLayout {
               spacing: theme.spacingNormal
 
-              Rectangle {
+              ColumnLayout {
                 Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: theme.spacingSmall
+
+                Text { text: "Tokens"; font.family: theme.fontSans; font.pixelSize: theme.fontLarge; font.bold: true; color: theme.primary }
+                Text { text: "Operate and inspect token output"; font.family: theme.fontSans; font.pixelSize: theme.fontSmall; color: theme.fgSurfaceVariant }
+
+                Row {
+                  spacing: theme.spacingSmall
+                  ThemedButton { theme: theme; variant: "filled"; text: "Refresh"; onClicked: svc.runAction("token refresh") }
+                  ThemedButton { theme: theme; variant: "error"; text: "Delete"; onClicked: svc.runAction("token delete") }
+                  ThemedButton { theme: theme; variant: "success"; text: "Fetch"; onClicked: svc.fetchToken() }
+                  ThemedButton { theme: theme; variant: "tonal"; text: svc.tokenVisible ? "Mask" : "Reveal"; enabled: svc.tokenValue !== ""; onClicked: svc.tokenVisible = !svc.tokenVisible }
+                  ThemedButton { theme: theme; variant: "tonal"; text: "Copy"; enabled: svc.tokenValue !== ""; onClicked: svc.copyToken() }
+                }
+
+                Rectangle { Layout.fillWidth: true; height: 1; color: theme.outlineVariant }
+
+                Text {
+                  Layout.fillWidth: true
+                  text: "Account: " + (svc.selectedAccount === "" ? "<none>" : svc.selectedAccount)
+                  font.family: theme.fontSans
+                  font.pixelSize: theme.fontSmall
+                  color: theme.fgSurfaceVariant
+                }
+
+                Rectangle {
+                  Layout.fillWidth: true
+                  Layout.fillHeight: true
+                  radius: theme.radiusNormal
+                  color: theme.surface
+                  border.color: theme.outlineVariant
+
+                  Column {
+                    anchors.fill: parent
+                    anchors.margins: theme.padNormal
+                    spacing: theme.spacingSmall
+                    Text { text: "Token Output"; font.family: theme.fontSans; font.pixelSize: theme.fontNormal; font.bold: true; color: theme.primary }
+                    Text {
+                      width: parent.width
+                      wrapMode: Text.WrapAnywhere
+                      text: svc.tokenValue === "" ? "No token fetched." : (svc.tokenVisible ? svc.tokenValue : "*".repeat(Math.min(svc.tokenValue.length, 180)))
+                      font.family: theme.fontSans
+                      font.pixelSize: theme.fontSmall
+                      color: theme.fgSurface
+                    }
+                    Rectangle { width: parent.width; height: 1; color: theme.outlineVariant }
+                    Text {
+                      width: parent.width
+                      wrapMode: Text.WrapAnywhere
+                      text: "Activity: " + svc.actionText
+                      font.family: theme.fontSans
+                      font.pixelSize: theme.fontSmall
+                      color: theme.fgSurfaceVariant
+                    }
+                  }
+                }
+              }
+
+              Rectangle {
+                Layout.preferredWidth: 300
                 Layout.fillHeight: true
                 radius: theme.radiusNormal
                 color: theme.surface
@@ -422,18 +481,19 @@ PanelWindow {
                   anchors.fill: parent
                   anchors.margins: theme.padNormal
                   spacing: theme.spacingSmall
-                  Text { text: "Accounts"; font.family: theme.fontSans; font.pixelSize: theme.fontLarge; font.bold: true; color: theme.primary }
-                  Text { text: "Select active account"; font.family: theme.fontSans; font.pixelSize: theme.fontSmall; color: theme.fgSurfaceVariant }
+                  Text { text: "Account Selection"; font.family: theme.fontSans; font.pixelSize: theme.fontNormal; font.bold: true; color: theme.primary }
+                  Text { text: "Selected: " + (svc.selectedAccount === "" ? "<none>" : svc.selectedAccount); font.family: theme.fontSans; font.pixelSize: theme.fontSmall; color: theme.fgSurfaceVariant; elide: Text.ElideRight; width: parent.width }
+                  Text { text: selectedStatusLine(); wrapMode: Text.WrapAnywhere; font.family: theme.fontSans; font.pixelSize: theme.fontSmall; color: theme.fgSurfaceVariant; width: parent.width }
                   Rectangle { width: parent.width; height: 1; color: theme.outlineVariant }
 
                   Flickable {
                     width: parent.width
-                    height: parent.height - 68
-                    contentHeight: accountColumn.implicitHeight
+                    height: parent.height - 88
+                    contentHeight: tokenAccountColumn.implicitHeight
                     clip: true
 
                     Column {
-                      id: accountColumn
+                      id: tokenAccountColumn
                       width: parent.width
                       spacing: theme.spacingSmall
 
@@ -441,8 +501,8 @@ PanelWindow {
                         model: svc.accounts
                         delegate: Rectangle {
                           required property string modelData
-                          width: accountColumn.width
-                          height: 38
+                          width: tokenAccountColumn.width
+                          height: 36
                           radius: theme.radiusNormal
                           color: svc.selectedAccount === modelData ? theme.secondaryContainer : theme.surfaceContainer
                           border.color: svc.selectedAccount === modelData ? theme.primary : theme.outlineVariant
@@ -462,85 +522,6 @@ PanelWindow {
                         }
                       }
                     }
-                  }
-                }
-              }
-
-              Rectangle {
-                Layout.preferredWidth: 300
-                Layout.fillHeight: true
-                radius: theme.radiusNormal
-                color: theme.surface
-                border.color: theme.outlineVariant
-
-                Column {
-                  anchors.fill: parent
-                  anchors.margins: theme.padNormal
-                  spacing: theme.spacingSmall
-                  Text { text: "Selected"; font.family: theme.fontSans; font.pixelSize: theme.fontNormal; font.bold: true; color: theme.primary }
-                  Text { text: svc.selectedAccount === "" ? "<none>" : svc.selectedAccount; font.family: theme.fontSans; font.pixelSize: theme.fontLarge; color: theme.fgSurface }
-                  Text { text: selectedStatusLine(); wrapMode: Text.WrapAnywhere; font.family: theme.fontSans; font.pixelSize: theme.fontSmall; color: theme.fgSurfaceVariant; width: parent.width }
-                  Rectangle { width: parent.width; height: 1; color: theme.outlineVariant }
-                  ThemedButton { width: parent.width; theme: theme; variant: "filled"; text: "Refresh Token"; onClicked: svc.runAction("token refresh") }
-                  ThemedButton { width: parent.width; theme: theme; variant: "success"; text: "Fetch Token"; onClicked: svc.fetchToken() }
-                }
-              }
-            }
-
-            // Tokens
-            ColumnLayout {
-              spacing: theme.spacingSmall
-
-              Text { text: "Tokens"; font.family: theme.fontSans; font.pixelSize: theme.fontLarge; font.bold: true; color: theme.primary }
-              Text { text: "Operate and inspect token output"; font.family: theme.fontSans; font.pixelSize: theme.fontSmall; color: theme.fgSurfaceVariant }
-
-              Row {
-                spacing: theme.spacingSmall
-                ThemedButton { theme: theme; variant: "filled"; text: "Refresh"; onClicked: svc.runAction("token refresh") }
-                ThemedButton { theme: theme; variant: "error"; text: "Delete"; onClicked: svc.runAction("token delete") }
-                ThemedButton { theme: theme; variant: "success"; text: "Fetch"; onClicked: svc.fetchToken() }
-                ThemedButton { theme: theme; variant: "tonal"; text: svc.tokenVisible ? "Mask" : "Reveal"; enabled: svc.tokenValue !== ""; onClicked: svc.tokenVisible = !svc.tokenVisible }
-                ThemedButton { theme: theme; variant: "tonal"; text: "Copy"; enabled: svc.tokenValue !== ""; onClicked: svc.copyToken() }
-              }
-
-              Rectangle { Layout.fillWidth: true; height: 1; color: theme.outlineVariant }
-
-              Text {
-                Layout.fillWidth: true
-                text: "Account: " + (svc.selectedAccount === "" ? "<none>" : svc.selectedAccount)
-                font.family: theme.fontSans
-                font.pixelSize: theme.fontSmall
-                color: theme.fgSurfaceVariant
-              }
-
-              Rectangle {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                radius: theme.radiusNormal
-                color: theme.surface
-                border.color: theme.outlineVariant
-
-                Column {
-                  anchors.fill: parent
-                  anchors.margins: theme.padNormal
-                  spacing: theme.spacingSmall
-                  Text { text: "Token Output"; font.family: theme.fontSans; font.pixelSize: theme.fontNormal; font.bold: true; color: theme.primary }
-                  Text {
-                    width: parent.width
-                    wrapMode: Text.WrapAnywhere
-                    text: svc.tokenValue === "" ? "No token fetched." : (svc.tokenVisible ? svc.tokenValue : "*".repeat(Math.min(svc.tokenValue.length, 180)))
-                    font.family: theme.fontSans
-                    font.pixelSize: theme.fontSmall
-                    color: theme.fgSurface
-                  }
-                  Rectangle { width: parent.width; height: 1; color: theme.outlineVariant }
-                  Text {
-                    width: parent.width
-                    wrapMode: Text.WrapAnywhere
-                    text: "Activity: " + svc.actionText
-                    font.family: theme.fontSans
-                    font.pixelSize: theme.fontSmall
-                    color: theme.fgSurfaceVariant
                   }
                 }
               }
