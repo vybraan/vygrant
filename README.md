@@ -145,6 +145,22 @@ tls_trust_file	/etc/ssl/certs/ca-certificates.crt
 tls_starttls
 ```
 
+## Quickshell Desktop UI (experimental)
+
+There is an experimental Quickshell UI under `quickshell/shell.qml`.
+
+- It shows daemon info, accounts, and status.
+- It supports token actions for the selected account: `refresh`, `delete`, and `get`.
+- It refreshes data periodically.
+
+Run it with:
+
+```bash
+quickshell --path ./quickshell/shell.qml
+```
+
+If `vygrant` is not in your `PATH`, launch quickshell from a shell where it is available.
+
 ## Alternatives
 vygrant is very simple. You may also consider these
 programs as alternatives:
