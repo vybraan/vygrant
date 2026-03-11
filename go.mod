@@ -1,13 +1,13 @@
 module github.com/vybraan/vygrant
 
-go 1.24.5
+go 1.25.0
 
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/spf13/cobra v1.10.2
 	github.com/zalando/go-keyring v0.2.6
-	golang.org/x/oauth2 v0.35.0
+	golang.org/x/oauth2 v0.36.0
 )
 
 require (
