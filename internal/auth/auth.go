@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"html"
 	"log"
 	"net/http"
 	"net/url"
@@ -21,51 +22,237 @@ const successHTML = `
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Authentication Successful</title>
+<title>vygrant · Authentication Complete</title>
 <style>
+  :root {
+    color-scheme: light dark;
+
+    --bg: #f6f8fb;
+    --bg-soft: #eef2f7;
+    --card: rgba(255, 255, 255, 0.88);
+    --card-border: rgba(15, 23, 42, 0.08);
+    --text: #0f172a;
+    --muted: #64748b;
+    --muted-strong: #334155;
+    --success: #16a34a;
+    --success-soft: #dcfce7;
+    --success-border: #bbf7d0;
+    --shadow: 0 24px 80px rgba(15, 23, 42, 0.12);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #020617;
+      --bg-soft: #0f172a;
+      --card: rgba(15, 23, 42, 0.78);
+      --card-border: rgba(148, 163, 184, 0.16);
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --muted-strong: #cbd5e1;
+      --success: #22c55e;
+      --success-soft: rgba(34, 197, 94, 0.12);
+      --success-border: rgba(34, 197, 94, 0.28);
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+    }
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    height: 100%%;
+  }
+
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-      Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
-    background: #f0f4f8;
     margin: 0;
-    padding: 0;
+    font-family:
+      Inter,
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      sans-serif;
+    background:
+      radial-gradient(circle at top left, rgba(34, 197, 94, 0.16), transparent 32rem),
+      radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.12), transparent 30rem),
+      linear-gradient(135deg, var(--bg), var(--bg-soft));
+    color: var(--text);
+    display: grid;
+    place-items: center;
+    padding: 24px;
+  }
+
+  .shell {
+    width: 100%%;
+    max-width: 460px;
+  }
+
+  .brand {
     display: flex;
-    height: 100vh;
     align-items: center;
     justify-content: center;
+    gap: 10px;
+    margin-bottom: 18px;
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
-  .container {
-    background: white;
-    padding: 2rem 3rem;
-    border-radius: 10px;
-    box-shadow: 0 4px 12px rgb(0 0 0 / 0.1);
-    max-width: 400px;
+
+  .brand-mark {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: var(--success);
+    box-shadow: 0 0 0 6px var(--success-soft);
+  }
+
+  .card {
+    position: relative;
+    overflow: hidden;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 24px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(18px);
+    padding: 34px;
     text-align: center;
   }
-  .success-icon {
-    font-size: 3rem;
-    color: #4BB543; /* nice green */
-    margin-bottom: 1rem;
+
+  .card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    height: 4px;
+    background: linear-gradient(90deg, transparent, var(--success), transparent);
   }
+
+  .icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 22px;
+    border-radius: 20px;
+    display: grid;
+    place-items: center;
+    color: var(--success);
+    background: var(--success-soft);
+    border: 1px solid var(--success-border);
+  }
+
+  .icon svg {
+    width: 34px;
+    height: 34px;
+  }
+
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding: 7px 12px;
+    border-radius: 999px;
+    color: var(--success);
+    background: var(--success-soft);
+    border: 1px solid var(--success-border);
+    font-size: 13px;
+    font-weight: 650;
+  }
+
   h1 {
-    margin: 0 0 1rem 0;
-    font-weight: 600;
+    margin: 0;
+    font-size: clamp(26px, 5vw, 34px);
+    line-height: 1.08;
+    letter-spacing: -0.04em;
+    font-weight: 760;
   }
+
   p {
-    font-size: 1rem;
-    color: #333;
-    margin-bottom: 0;
+    margin: 14px 0 0;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.65;
+  }
+
+  strong {
+    color: var(--muted-strong);
+    font-weight: 700;
+  }
+
+  .account {
+    margin-top: 20px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: rgba(148, 163, 184, 0.12);
+    border: 1px solid var(--card-border);
+    color: var(--muted-strong);
+    font-family:
+      ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      Monaco,
+      Consolas,
+      "Liberation Mono",
+      monospace;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+
+  .footer {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--card-border);
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .footer code {
+    color: var(--muted-strong);
+    background: rgba(148, 163, 184, 0.14);
+    padding: 2px 6px;
+    border-radius: 7px;
+    font-family:
+      ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      Monaco,
+      Consolas,
+      "Liberation Mono",
+      monospace;
   }
 </style>
 </head>
 <body>
-  <div class="container">
-    <div class="success-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-badge-check-icon lucide-badge-check"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="m9 12 2 2 4-4"/></svg></div>
-    <h1>Authentication Successful</h1>
-    <p>Your account <strong>%s</strong> has been authenticated successfully.</p>
-    <p>You can safely close this tab now.</p>
-    <p><em>vygrant</em> will continue handling your authentication tokens in the background.</p>
-  </div>
+  <main class="shell">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span>vygrant authorization broker</span>
+    </div>
+
+    <section class="card" aria-labelledby="title">
+      <div class="icon" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/>
+          <path d="m9 12 2 2 4-4"/>
+        </svg>
+      </div>
+
+      <div class="status">Authentication complete</div>
+
+      <h1 id="title">You are signed in.</h1>
+
+      <p>
+        The account below has been linked successfully. You can close this browser tab and return to your terminal.
+      </p>
+
+      <div class="account">%s</div>
+
+      <p class="footer">
+        <code>vygrant</code> will keep handling token refresh in the background.
+      </p>
+    </section>
+  </main>
 </body>
 </html>
 `
@@ -76,54 +263,274 @@ const errorHTML = `
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Error</title>
+<title>vygrant · Authentication Failed</title>
 <style>
+  :root {
+    color-scheme: light dark;
+
+    --bg: #f8fafc;
+    --bg-soft: #f1f5f9;
+    --card: rgba(255, 255, 255, 0.9);
+    --card-border: rgba(15, 23, 42, 0.08);
+    --text: #0f172a;
+    --muted: #64748b;
+    --muted-strong: #334155;
+    --danger: #dc2626;
+    --danger-soft: #fee2e2;
+    --danger-border: #fecaca;
+    --link: #2563eb;
+    --shadow: 0 24px 80px rgba(15, 23, 42, 0.12);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #020617;
+      --bg-soft: #111827;
+      --card: rgba(15, 23, 42, 0.8);
+      --card-border: rgba(148, 163, 184, 0.16);
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --muted-strong: #cbd5e1;
+      --danger: #f87171;
+      --danger-soft: rgba(248, 113, 113, 0.12);
+      --danger-border: rgba(248, 113, 113, 0.28);
+      --link: #60a5fa;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+    }
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    height: 100%%;
+  }
+
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-      Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
-    background: #f8d7da;
     margin: 0;
-    padding: 0;
+    font-family:
+      Inter,
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      sans-serif;
+    background:
+      radial-gradient(circle at top left, rgba(220, 38, 38, 0.14), transparent 32rem),
+      radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.10), transparent 30rem),
+      linear-gradient(135deg, var(--bg), var(--bg-soft));
+    color: var(--text);
+    display: grid;
+    place-items: center;
+    padding: 24px;
+  }
+
+  .shell {
+    width: 100%%;
+    max-width: 500px;
+  }
+
+  .brand {
     display: flex;
-    height: 100vh;
     align-items: center;
     justify-content: center;
+    gap: 10px;
+    margin-bottom: 18px;
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
-  .container {
-    background: #fff0f0;
-    padding: 2rem 3rem;
-    border-radius: 10px;
-    box-shadow: 0 4px 12px rgb(0 0 0 / 0.1);
-    max-width: 400px;
+
+  .brand-mark {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: var(--danger);
+    box-shadow: 0 0 0 6px var(--danger-soft);
+  }
+
+  .card {
+    position: relative;
+    overflow: hidden;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 24px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(18px);
+    padding: 34px;
     text-align: center;
-    border: 1px solid #f5c6cb;
   }
-  .error-icon {
-    font-size: 3rem;
-    color: #dc3545; /* bootstrap danger red */
-    margin-bottom: 1rem;
+
+  .card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    height: 4px;
+    background: linear-gradient(90deg, transparent, var(--danger), transparent);
   }
+
+  .icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 22px;
+    border-radius: 20px;
+    display: grid;
+    place-items: center;
+    color: var(--danger);
+    background: var(--danger-soft);
+    border: 1px solid var(--danger-border);
+  }
+
+  .icon svg {
+    width: 34px;
+    height: 34px;
+  }
+
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding: 7px 12px;
+    border-radius: 999px;
+    color: var(--danger);
+    background: var(--danger-soft);
+    border: 1px solid var(--danger-border);
+    font-size: 13px;
+    font-weight: 650;
+  }
+
   h1 {
-    margin: 0 0 1rem 0;
-    font-weight: 600;
-    color: #721c24;
+    margin: 0;
+    font-size: clamp(26px, 5vw, 34px);
+    line-height: 1.08;
+    letter-spacing: -0.04em;
+    font-weight: 760;
   }
+
   p {
-    font-size: 1rem;
-    color: #721c24;
-    margin-bottom: 0;
+    margin: 14px 0 0;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.65;
+  }
+
+  .error-box {
+    margin-top: 20px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: rgba(148, 163, 184, 0.12);
+    border: 1px solid var(--card-border);
+    color: var(--muted-strong);
+    font-family:
+      ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      Monaco,
+      Consolas,
+      "Liberation Mono",
+      monospace;
+    font-size: 13px;
+    line-height: 1.55;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+
+  .actions {
+    margin-top: 24px;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  a {
+    color: inherit;
+  }
+
+  .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 0 15px;
+    border-radius: 12px;
+    background: var(--text);
+    color: var(--bg);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 650;
+  }
+
+  .button-secondary {
+    background: transparent;
+    color: var(--link);
+    border: 1px solid var(--card-border);
+  }
+
+  .footer {
+    margin-top: 22px;
+    padding-top: 20px;
+    border-top: 1px solid var(--card-border);
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .footer code {
+    color: var(--muted-strong);
+    background: rgba(148, 163, 184, 0.14);
+    padding: 2px 6px;
+    border-radius: 7px;
+    font-family:
+      ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      Monaco,
+      Consolas,
+      "Liberation Mono",
+      monospace;
   }
 </style>
 </head>
 <body>
-  <div class="container">
-    <div class="error-icon">
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-triangle-alert-icon lucide-triangle-alert"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
-</div>
-    <h1>Error Occurred</h1>
-    <p>%s</p>
-    <p>Please try again or consider opening an <a href="https://github.com/vybraan/vygrant/issues/new/choose">GitHub Issue</a> if the problem persists.  </p>
-  </div>
+  <main class="shell">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span>vygrant authorization broker</span>
+    </div>
+
+    <section class="card" aria-labelledby="title">
+      <div class="icon" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/>
+          <path d="M12 9v4"/>
+          <path d="M12 17h.01"/>
+        </svg>
+      </div>
+
+      <div class="status">Authentication failed</div>
+
+      <h1 id="title">The sign-in could not be completed.</h1>
+
+      <p>
+        vygrant received a response from the browser, but the authorization flow ended with an error.
+      </p>
+
+      <div class="error-box">%s</div>
+
+      <div class="actions">
+        <a class="button" href="javascript:location.reload()">Try again</a>
+        <a class="button button-secondary" href="https://github.com/vybraan/vygrant/issues/new/choose">Open GitHub Issue</a>
+      </div>
+
+      <p class="footer">
+        You can close this tab and run the <code>vygrant</code> login command again from your terminal.
+      </p>
+    </section>
+  </main>
 </body>
 </html>
 `
@@ -134,7 +541,11 @@ func StartAuthFlow(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, errorHTML, "Account '"+accountName+"' not found.")
+
+		safeError := html.EscapeString("Account '" + accountName + "' not found.")
+
+		fmt.Fprintf(w, errorHTML, safeError)
+		// fmt.Fprintf(w, errorHTML, "Account '"+accountName+"' not found.")
 		return
 	}
 	oauthCfg := config.GetOAuth2Config(acct)
@@ -195,6 +606,10 @@ func HandleOAuthCallback(tokenStore storage.TokenStore, httpClient *http.Client)
 		tokenStore.Set(accountName, token)
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		fmt.Fprintf(w, successHTML, accountName)
+
+		safeAccount := html.EscapeString(accountName)
+
+		fmt.Fprintf(w, successHTML, safeAccount)
+		// fmt.Fprintf(w, successHTML, accountName)
 	}
 }
