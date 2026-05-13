@@ -48,6 +48,12 @@ func checkExpiringTokens(cfg *config.Config, tokenStore storage.TokenStore, http
 			continue
 		}
 
+		if token.Expiry.Before(time.Now()) {
+			log.Printf("Token for %s has expired. Please refresh manually.", account)
+			Notify("vygrant - token expired", "Token for "+account+" has expired and must be refreshed manually.")
+			continue
+		}
+
 		if token.Expiry.Before(time.Now().Add(expiryThreshold)) {
 			newToken, err := RefreshToken(account, cfg, token, httpClient)
 			if err != nil {
@@ -61,9 +67,6 @@ func checkExpiringTokens(cfg *config.Config, tokenStore storage.TokenStore, http
 			}
 
 			log.Printf("Token for %s refreshed. New expiry: %s", account, newToken.Expiry)
-		} else if token.Expiry.Before(time.Now()) {
-			log.Printf("Token for %s has expired. Please refresh manually.", account)
-			Notify("vygrant - token expired", "Token for "+account+" has expired and must be refreshed manually.")
 		}
 
 	}
