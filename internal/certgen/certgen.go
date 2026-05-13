@@ -89,7 +89,7 @@ func ensureCA(certPath, keyPath string) (*x509.Certificate, *ecdsa.PrivateKey, e
 			CommonName: "vygrant local CA",
 		},
 		NotBefore:             time.Now().Add(-1 * time.Hour),
-		NotAfter:              time.Now().Add(10 * 365 * 24 * time.Hour),
+		NotAfter:              time.Now().Add(5 * 365 * 24 * time.Hour),
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
