@@ -46,6 +46,20 @@ type Daemon struct {
 // an in-memory access-token cache). When cfg.PersistTokens is false, or when a keyring
 // is unavailable, it uses an in-memory store only. The returned Daemon has Config and
 // TokenStore initialized.
+func newRefreshStore() (storage.TokenStore, string) {
+	if storage.KeyringAvailable("") {
+		return storage.NewKeyringStore(""), "keyring"
+	}
+	if storage.PassAvailable() {
+		return storage.NewPassStore(""), "pass"
+	}
+	return nil, ""
+}
+
+func newSplitWithRefresh(refresh storage.TokenStore) *storage.SplitStore {
+	return storage.NewSplitStore(refresh)
+}
+
 func NewDaemon() (*Daemon, error) {
 	confPath := os.Getenv("VYGRANT_CONFIG")
 	if confPath == "" {
@@ -64,57 +78,44 @@ func NewDaemon() (*Daemon, error) {
 	auth.LoadedAccounts = cfg.Accounts
 
 	var store storage.TokenStore
+	var legacyMigrated string
 	home, _ := os.UserHomeDir()
 	legacyTokenPath := path.Join(home, ".vybr/vygrant/tokens.json")
 
 	if cfg.PersistTokens {
-		if storage.KeyringAvailable("") {
-			refreshStore := storage.NewKeyringStore("")
-			splitStore := storage.NewSplitStore(refreshStore)
-			if migrated, backupPath, err := migrateLegacyTokens(legacyTokenPath, splitStore); err != nil {
-				log.Printf("warning: failed to migrate legacy tokens: %v", err)
-			} else if migrated {
-				log.Printf("migrated legacy tokens to keyring; backed up file to %s", backupPath)
-				store = splitStore
-				return &Daemon{
-					Config:          cfg,
-					TokenStore:      store,
-					LegacyMigration: fmt.Sprintf("migrated legacy file to keyring (backup: %s)", backupPath),
-				}, nil
-			}
-			store = splitStore
-		} else if storage.PassAvailable() {
-			refreshStore := storage.NewPassStore("")
-			splitStore := storage.NewSplitStore(refreshStore)
-			if migrated, backupPath, err := migrateLegacyTokens(legacyTokenPath, splitStore); err != nil {
-				log.Printf("warning: failed to migrate legacy tokens: %v", err)
-			} else if migrated {
-				log.Printf("migrated legacy tokens to pass store; backed up file to %s", backupPath)
-				store = splitStore
-				return &Daemon{
-					Config:          cfg,
-					TokenStore:      store,
-					LegacyMigration: fmt.Sprintf("migrated legacy file to pass store (backup: %s)", backupPath),
-				}, nil
-			}
-			store = splitStore
-		} else {
-			if fileExists(legacyTokenPath) {
-				log.Println("warning: keyring unavailable; using legacy file token store")
-				store = storage.NewFileStore(legacyTokenPath)
-			} else {
-				log.Println("warning: token persistence unavailable; falling back to in-memory token store")
-				store = storage.NewMemoryStore()
-			}
-		}
+		store, legacyMigrated = initPersistentStore(legacyTokenPath)
 	} else {
 		store = storage.NewMemoryStore()
 	}
 
 	return &Daemon{
-		Config:     cfg,
-		TokenStore: store,
+		Config:          cfg,
+		TokenStore:      store,
+		LegacyMigration: legacyMigrated,
 	}, nil
+}
+
+func initPersistentStore(legacyTokenPath string) (storage.TokenStore, string) {
+	refresh, backend := newRefreshStore()
+	if refresh != nil {
+		splitStore := newSplitWithRefresh(refresh)
+		if migrated, backupPath, err := migrateLegacyTokens(legacyTokenPath, splitStore); err != nil {
+			log.Printf("warning: failed to migrate legacy tokens: %v", err)
+		} else if migrated {
+			msg := fmt.Sprintf("migrated legacy file to %s (backup: %s)", backend, backupPath)
+			log.Printf("legacy migration: %s", msg)
+			return splitStore, msg
+		}
+		return splitStore, ""
+	}
+
+	if fileExists(legacyTokenPath) {
+		log.Println("warning: keyring unavailable; using legacy file token store")
+		return storage.NewFileStore(legacyTokenPath), ""
+	}
+
+	log.Println("warning: token persistence unavailable; falling back to in-memory token store")
+	return storage.NewMemoryStore(), ""
 }
 
 func (d *Daemon) Start() {
