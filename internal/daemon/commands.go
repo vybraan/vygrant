@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"path"
@@ -93,10 +94,14 @@ func (d *Daemon) HandleCommand(conn net.Conn, input string, scanner *bufio.Scann
 
 				Notify("vygrant - auto refresh failed", fmt.Sprintf("Token for '%s' could not be refreshed and has been deleted. Please re-authenticate.", account))
 				writeError(conn, "Failed to auto refresh token for '%s': %v", account, err)
-				d.TokenStore.Delete(account)
+				if err := d.TokenStore.Delete(account); err != nil {
+					log.Printf("failed to delete stale token for %s: %v", account, err)
+				}
 				return
 			}
-			d.TokenStore.Set(account, newToken)
+			if err := d.TokenStore.Set(account, newToken); err != nil {
+				log.Printf("failed to save refreshed token for %s: %v", account, err)
+			}
 			token = newToken
 			Notify("vygrant - token refreshed", fmt.Sprintf("Token for '%s' successfully refreshed.", account))
 		}
@@ -134,10 +139,14 @@ func (d *Daemon) HandleCommand(conn net.Conn, input string, scanner *bufio.Scann
 		newToken, err := RefreshToken(account, d.Config, token, d.HTTPClient)
 		if err != nil {
 			writeError(conn, "Failed to refresh token for '%s': %v", account, err)
-			d.TokenStore.Delete(account)
+			if err := d.TokenStore.Delete(account); err != nil {
+				log.Printf("failed to delete stale token for %s: %v", account, err)
+			}
 			return
 		}
-		d.TokenStore.Set(account, newToken)
+		if err := d.TokenStore.Set(account, newToken); err != nil {
+			log.Printf("failed to save refreshed token for %s: %v", account, err)
+		}
 		Notify("vygrant - token refreshed", fmt.Sprintf("Token for '%s' successfully refreshed.", account))
 		writeResponse(conn, "Token for '%s' refreshed", account)
 	case "dump-tokens":
