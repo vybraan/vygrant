@@ -122,11 +122,7 @@ func (d *Daemon) Start() {
 
 	stopCh := make(chan struct{})
 
-	httpClient := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
+	httpClient := &http.Client{}
 	d.HTTPClient = httpClient
 
 	if d.Config.TokenEventCmd != "" {
