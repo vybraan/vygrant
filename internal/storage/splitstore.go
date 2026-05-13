@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"sync"
 
 	"golang.org/x/oauth2"
 )
 
 type SplitStore struct {
+	mu      sync.Mutex
 	access  *MemoryStore
 	refresh TokenStore
 }
@@ -21,6 +23,8 @@ func NewSplitStore(refresh TokenStore) *SplitStore {
 }
 
 func (s *SplitStore) Get(account string) (*oauth2.Token, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	var token *oauth2.Token
 
 	accessToken, errAccess := s.access.Get(account)
@@ -51,6 +55,8 @@ func (s *SplitStore) Get(account string) (*oauth2.Token, error) {
 }
 
 func (s *SplitStore) Set(account string, token *oauth2.Token) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if token == nil {
 		return os.ErrInvalid
 	}
@@ -72,6 +78,8 @@ func (s *SplitStore) Set(account string, token *oauth2.Token) error {
 }
 
 func (s *SplitStore) Delete(account string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	errAccess := s.access.Delete(account)
 	errRefresh := s.refresh.Delete(account)
 
@@ -94,6 +102,8 @@ func (s *SplitStore) Delete(account string) error {
 }
 
 func (s *SplitStore) ListAccounts() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	seen := map[string]struct{}{}
 	for _, account := range s.access.ListAccounts() {
 		seen[account] = struct{}{}

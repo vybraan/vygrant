@@ -34,7 +34,8 @@ func (m *MemoryStore) Get(account string) (*oauth2.Token, error) {
 	if !exists {
 		return nil, os.ErrNotExist
 	}
-	return token, nil
+	copyToken := *token
+	return &copyToken, nil
 }
 
 func (m *MemoryStore) Delete(account string) error {

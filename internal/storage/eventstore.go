@@ -61,8 +61,8 @@ func (e *EventStore) Restore(data []byte) error {
 		if err := dumper.Restore(data); err != nil {
 			return err
 		}
-		e.trigger("", "restore")
-		e.trigger("", "change")
+		e.trigger("*", "restore")
+		e.trigger("*", "change")
 		return nil
 	}
 	return os.ErrInvalid

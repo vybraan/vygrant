@@ -130,6 +130,7 @@ func (d *Daemon) Start() {
 		d.TokenStore = storage.NewEventStore(d.TokenStore, d.Config.TokenEventCmd)
 	}
 
+	bgWg.Add(1)
 	go StartBackgroundTasks(d.Config, d.TokenStore, d.HTTPClient, stopCh)
 
 	httpsEnabled := isListenerEnabled(d.Config.HTTPSListen)
@@ -242,20 +243,20 @@ func (d *Daemon) Start() {
 	}
 
 	close(stopCh)
+	WaitForBackgroundTasks()
+
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if httpServer != nil {
-		_ = httpServer.Shutdown(shutdownCtx)
+		if err := httpServer.Shutdown(shutdownCtx); err != nil {
+			log.Printf("http server shutdown: %v", err)
+		}
 	}
 	if httpsEnabled {
-		_ = httpsServer.Shutdown(shutdownCtx)
-	}
-	if httpListener != nil {
-		_ = httpListener.Close()
-	}
-	if httpsListener != nil {
-		_ = httpsListener.Close()
+		if err := httpsServer.Shutdown(shutdownCtx); err != nil {
+			log.Printf("https server shutdown: %v", err)
+		}
 	}
 }
 
