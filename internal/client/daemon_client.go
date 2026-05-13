@@ -3,15 +3,27 @@ package client
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 
 	"github.com/vybraan/vygrant/internal/daemon"
 )
 
-// SendCommand sends a text command to the daemon over the Unix domain socket.
-// It returns the daemon's response with leading and trailing whitespace removed,
-// or an error if connecting, writing, or reading from the socket fails.
+func readResponse(conn net.Conn) (string, error) {
+	data, err := io.ReadAll(conn)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %w", err)
+	}
+	return strings.TrimSpace(string(data)), nil
+}
+
+func shutdownWrite(conn net.Conn) {
+	if c, ok := conn.(interface{ CloseWrite() error }); ok {
+		c.CloseWrite()
+	}
+}
+
 func SendCommand(command string) (string, error) {
 
 	conn, err := net.Dial("unix", daemon.SocketPath())
@@ -25,13 +37,9 @@ func SendCommand(command string) (string, error) {
 		return "", fmt.Errorf("failed to send command: %w", err)
 	}
 
-	buf := make([]byte, 8192)
-	n, err := conn.Read(buf)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
-	}
+	shutdownWrite(conn)
 
-	return strings.TrimSpace(string(buf[:n])), nil
+	return readResponse(conn)
 }
 
 func SendCommandWithPayload(command string, payload []byte) (string, error) {
@@ -52,10 +60,7 @@ func SendCommandWithPayload(command string, payload []byte) (string, error) {
 		return "", fmt.Errorf("failed to send command: %w", err)
 	}
 
-	resp := make([]byte, 8192)
-	n, err := conn.Read(resp)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
-	}
-	return strings.TrimSpace(string(resp[:n])), nil
+	shutdownWrite(conn)
+
+	return readResponse(conn)
 }
