@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"golang.org/x/oauth2"
 )
@@ -15,6 +16,7 @@ import (
 const defaultPassPrefix = "vygrant"
 
 type PassStore struct {
+	mu     sync.Mutex
 	prefix string
 }
 
@@ -31,6 +33,8 @@ func PassAvailable() bool {
 }
 
 func (p *PassStore) Get(account string) (*oauth2.Token, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	entry := p.entryPath(account)
 	cmd := exec.Command("pass", "show", entry)
 	output, err := cmd.CombinedOutput()
@@ -52,6 +56,8 @@ func (p *PassStore) Get(account string) (*oauth2.Token, error) {
 }
 
 func (p *PassStore) Set(account string, token *oauth2.Token) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if token == nil || token.RefreshToken == "" {
 		return nil
 	}
@@ -66,6 +72,8 @@ func (p *PassStore) Set(account string, token *oauth2.Token) error {
 }
 
 func (p *PassStore) Delete(account string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	entry := p.entryPath(account)
 	cmd := exec.Command("pass", "rm", "-f", entry)
 	output, err := cmd.CombinedOutput()
@@ -79,6 +87,8 @@ func (p *PassStore) Delete(account string) error {
 }
 
 func (p *PassStore) ListAccounts() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	cmd := exec.Command("pass", "ls", p.prefix)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
