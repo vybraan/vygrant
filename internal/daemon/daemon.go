@@ -149,7 +149,7 @@ func (d *Daemon) Start() {
 		d.PublicKey = publicKey
 	}
 
-	handler := api.Router(&d.TokenStore, d.HTTPClient)
+	handler := api.Router(d.TokenStore, d.HTTPClient)
 
 	httpAddr := "localhost:" + d.Config.HTTPListen
 	httpsAddr := "localhost:" + d.Config.HTTPSListen
