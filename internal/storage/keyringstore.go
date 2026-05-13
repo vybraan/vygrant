@@ -176,7 +176,7 @@ func (k *KeyringStore) removeAccountFromIndex(account string) error {
 }
 
 func (k *KeyringStore) Dump() ([]byte, error) {
-	accounts, _ := k.readAccountIndex()
+	accounts := k.ListAccounts()
 	dump := make(map[string]*oauth2.Token, len(accounts))
 	for _, account := range accounts {
 		token, err := k.Get(account)
