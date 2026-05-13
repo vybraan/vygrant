@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"sync"
 
 	"github.com/zalando/go-keyring"
 	"golang.org/x/oauth2"
@@ -16,6 +17,7 @@ const (
 )
 
 type KeyringStore struct {
+	mu      sync.Mutex
 	service string
 }
 
@@ -42,6 +44,8 @@ func KeyringAvailable(service string) bool {
 }
 
 func (k *KeyringStore) Get(account string) (*oauth2.Token, error) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
 	secret, err := keyring.Get(k.service, account)
 	if err != nil {
 		if errors.Is(err, keyring.ErrNotFound) {
@@ -61,6 +65,8 @@ func (k *KeyringStore) Get(account string) (*oauth2.Token, error) {
 }
 
 func (k *KeyringStore) Set(account string, token *oauth2.Token) error {
+	k.mu.Lock()
+	defer k.mu.Unlock()
 	if token == nil || token.RefreshToken == "" {
 		return nil
 	}
@@ -78,6 +84,8 @@ func (k *KeyringStore) Set(account string, token *oauth2.Token) error {
 }
 
 func (k *KeyringStore) Delete(account string) error {
+	k.mu.Lock()
+	defer k.mu.Unlock()
 	deleteErr := keyring.Delete(k.service, account)
 	if deleteErr != nil && !errors.Is(deleteErr, keyring.ErrNotFound) {
 		return deleteErr
@@ -92,6 +100,8 @@ func (k *KeyringStore) Delete(account string) error {
 }
 
 func (k *KeyringStore) ListAccounts() []string {
+	k.mu.Lock()
+	defer k.mu.Unlock()
 	accounts, err := k.readAccountIndex()
 	if err != nil {
 		return []string{}
@@ -166,7 +176,7 @@ func (k *KeyringStore) removeAccountFromIndex(account string) error {
 }
 
 func (k *KeyringStore) Dump() ([]byte, error) {
-	accounts := k.ListAccounts()
+	accounts, _ := k.readAccountIndex()
 	dump := make(map[string]*oauth2.Token, len(accounts))
 	for _, account := range accounts {
 		token, err := k.Get(account)
