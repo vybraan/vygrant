@@ -545,7 +545,6 @@ func StartAuthFlow(w http.ResponseWriter, r *http.Request) {
 		safeError := html.EscapeString("Account '" + accountName + "' not found.")
 
 		fmt.Fprintf(w, errorHTML, safeError)
-		// fmt.Fprintf(w, errorHTML, "Account '"+accountName+"' not found.")
 		return
 	}
 	oauthCfg := config.GetOAuth2Config(acct)

@@ -37,14 +37,6 @@ func LoadConfig(path string) (*Config, error) {
 	return &cfg, nil
 }
 
-func LoadConfigFromEnv() (*Config, error) {
-	confPath := os.Getenv("VYGRANT_CONFIG")
-	if confPath == "" {
-		return nil, fmt.Errorf("could not load env config")
-	}
-	return LoadConfig(confPath)
-}
-
 func GetOAuth2Config(acct *Account) *oauth2.Config {
 	return &oauth2.Config{
 		ClientID:     acct.ClientID,
