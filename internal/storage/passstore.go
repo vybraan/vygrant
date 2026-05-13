@@ -62,8 +62,6 @@ func (p *PassStore) Set(account string, token *oauth2.Token) error {
 	}
 	cmd := exec.Command("pass", "insert", "-m", "-f", entry)
 	cmd.Stdin = bytes.NewBufferString(secret + "\n")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
