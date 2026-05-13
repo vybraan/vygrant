@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -262,11 +263,18 @@ func (d *Daemon) handleConnections(listener net.Listener) {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			continue
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
+			var netErr net.Error
+			if errors.As(err, &netErr) && netErr.Timeout() {
+				continue
+			}
+			log.Printf("accept error: %v", err)
+			return
 		}
 		go d.handle(conn)
 	}
-
 }
 
 func (d *Daemon) handle(conn net.Conn) {
