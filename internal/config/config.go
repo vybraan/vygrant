@@ -32,6 +32,7 @@ func LoadConfig(path string) (*Config, error) {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("config file not found at %s — please run `vygrant init` or create one manually", path)
 		}
+		return nil, fmt.Errorf("failed to parse config at %s: %w", path, err)
 	}
 	return &cfg, nil
 }
