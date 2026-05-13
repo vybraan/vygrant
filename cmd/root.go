@@ -7,6 +7,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var Version = "dev"
+
 var rootCmd = &cobra.Command{
 	Use:   "vygrant",
 	Short: "OAuth2 authentication daemon",

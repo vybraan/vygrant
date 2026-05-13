@@ -20,6 +20,8 @@ builds:
     main: ./main.go
     env:
       - CGO_ENABLED=0
+    ldflags:
+      - -X github.com/vybraan/vygrant/cmd.Version={{ .Version }}
     goos:
       - linux
       - windows
