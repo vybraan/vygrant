@@ -56,7 +56,7 @@ func (k *KeyringStore) Get(account string) (*oauth2.Token, error) {
 
 	token, err := DecodeTokenSecret(secret)
 	if err != nil {
-		if err.Error() == "empty secret" || err.Error() == "empty refresh token" {
+		if errors.Is(err, ErrEmptySecret) || errors.Is(err, ErrEmptyRefreshToken) {
 			return nil, os.ErrNotExist
 		}
 		return nil, err

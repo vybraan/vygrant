@@ -9,11 +9,14 @@ import (
 	"golang.org/x/oauth2"
 )
 
+var ErrEmptySecret = errors.New("empty secret")
+var ErrEmptyRefreshToken = errors.New("empty refresh token")
+
 const keyringSecretPrefix = "v1:"
 
 func EncodeTokenSecret(token *oauth2.Token) (string, error) {
 	if token == nil || token.RefreshToken == "" {
-		return "", errors.New("empty refresh token")
+		return "", ErrEmptyRefreshToken
 	}
 	data, err := json.Marshal(keyringTokenEntry{RefreshToken: token.RefreshToken})
 	if err != nil {
@@ -33,7 +36,7 @@ func DecodeTokenSecret(secret string) (*oauth2.Token, error) {
 			return nil, err
 		}
 		if entry.RefreshToken == "" {
-			return nil, errors.New("empty refresh token")
+			return nil, ErrEmptyRefreshToken
 		}
 		return &oauth2.Token{RefreshToken: entry.RefreshToken}, nil
 	}
@@ -45,13 +48,13 @@ func DecodeTokenSecret(secret string) (*oauth2.Token, error) {
 			return nil, err
 		}
 		if entry.RefreshToken == "" {
-			return nil, errors.New("empty refresh token")
+			return nil, ErrEmptyRefreshToken
 		}
 		return &oauth2.Token{RefreshToken: entry.RefreshToken}, nil
 	}
 
 	if secret == "" {
-		return nil, errors.New("empty secret")
+		return nil, ErrEmptySecret
 	}
 	return &oauth2.Token{RefreshToken: secret}, nil
 }

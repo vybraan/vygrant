@@ -10,7 +10,7 @@ import (
 )
 
 type FileStore struct {
-	mu     sync.Mutex
+	mu     sync.RWMutex
 	path   string
 	tokens map[string]*oauth2.Token
 }
@@ -25,13 +25,14 @@ func NewFileStore(path string) *FileStore {
 }
 
 func (fs *FileStore) Get(account string) (*oauth2.Token, error) {
-	fs.mu.Lock()
-	defer fs.mu.Unlock()
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
 	token, ok := fs.tokens[account]
 	if !ok {
 		return nil, os.ErrNotExist
 	}
-	return token, nil
+	copyToken := *token
+	return &copyToken, nil
 }
 
 func (fs *FileStore) Set(account string, token *oauth2.Token) error {
@@ -73,8 +74,8 @@ func (fs *FileStore) load() {
 }
 
 func (fs *FileStore) ListAccounts() []string {
-	fs.mu.Lock()
-	defer fs.mu.Unlock()
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
 	accounts := make([]string, 0, len(fs.tokens))
 	for acc := range fs.tokens {
 		accounts = append(accounts, acc)
@@ -83,8 +84,8 @@ func (fs *FileStore) ListAccounts() []string {
 }
 
 func (fs *FileStore) Dump() ([]byte, error) {
-	fs.mu.Lock()
-	defer fs.mu.Unlock()
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
 	return json.Marshal(fs.tokens)
 }
 
