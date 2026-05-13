@@ -56,7 +56,9 @@ func checkExpiringTokens(cfg *config.Config, tokenStore storage.TokenStore, http
 				continue
 			}
 
-			tokenStore.Set(account, newToken)
+			if err := tokenStore.Set(account, newToken); err != nil {
+				log.Printf("failed to save refreshed token for %s: %v", account, err)
+			}
 
 			log.Printf("Token for %s refreshed. New expiry: %s", account, newToken.Expiry)
 		} else if token.Expiry.Before(time.Now()) {

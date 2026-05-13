@@ -603,13 +603,16 @@ func HandleOAuthCallback(tokenStore storage.TokenStore, httpClient *http.Client)
 			return
 		}
 
-		tokenStore.Set(accountName, token)
+		if err := tokenStore.Set(accountName, token); err != nil {
+			log.Printf("failed to save token for account %s: %v", accountName, err)
+			writeErrorPage(w, http.StatusInternalServerError, "Authentication succeeded but failed to save token.")
+			return
+		}
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 		safeAccount := html.EscapeString(accountName)
 
 		fmt.Fprintf(w, successHTML, safeAccount)
-		// fmt.Fprintf(w, successHTML, accountName)
 	}
 }
