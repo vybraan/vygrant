@@ -36,8 +36,9 @@ func RefreshToken(account string, cfg *config.Config, oldToken *oauth2.Token, ht
 // checkExpiringTokens iterates configured accounts and refreshes tokens whose expiry is within expiryThreshold.
 // It skips accounts with no stored token or without a refresh token. For tokens needing refresh it calls
 // RefreshToken (using the provided httpClient when non-nil), updates tokenStore on success, and logs and
-// notifies on refresh failures. If a token is already expired it logs and sends an expiration notification.
+// notifies on refresh failures.
 func checkExpiringTokens(cfg *config.Config, tokenStore storage.TokenStore, httpClient *http.Client) {
+	now := time.Now()
 	for account := range cfg.Accounts {
 		token, err := tokenStore.Get(account)
 		if err != nil || token == nil {
@@ -48,13 +49,7 @@ func checkExpiringTokens(cfg *config.Config, tokenStore storage.TokenStore, http
 			continue
 		}
 
-		if token.Expiry.Before(time.Now()) {
-			log.Printf("Token for %s has expired. Please refresh manually.", account)
-			Notify("vygrant - token expired", "Token for "+account+" has expired and must be refreshed manually.")
-			continue
-		}
-
-		if token.Expiry.Before(time.Now().Add(expiryThreshold)) {
+		if token.Expiry.Before(now.Add(expiryThreshold)) {
 			newToken, err := RefreshToken(account, cfg, token, httpClient)
 			if err != nil {
 				log.Printf("failed to auto-refresh token for %s: %v", account, err)
