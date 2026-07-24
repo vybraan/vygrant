@@ -12,7 +12,7 @@ import (
 
 const (
 	checkInterval   = 30 * time.Minute
-	expiryThreshold = 10 * time.Minute
+	expiryThreshold = 35 * time.Minute
 )
 
 var bgWg sync.WaitGroup

@@ -2,7 +2,9 @@ package daemon
 
 import (
 	"context"
+	"errors"
 	"log"
+	"net"
 	"net/http"
 	"time"
 
@@ -10,6 +12,10 @@ import (
 	"github.com/vybraan/vygrant/internal/storage"
 	"golang.org/x/oauth2"
 )
+
+const refreshRetries = 1
+
+var refreshRetryDelay = time.Second
 
 // RefreshToken obtains a new OAuth2 token for the named account using the provided existing token.
 // If httpClient is non-nil it is attached to the refresh request context and used for HTTP calls.
@@ -19,18 +25,44 @@ func RefreshToken(account string, cfg *config.Config, oldToken *oauth2.Token, ht
 	if acct == nil {
 		return nil, ErrAccountNotFound
 	}
+	if oldToken == nil {
+		return nil, errors.New("oauth2: token is nil")
+	}
 
 	oauthCfg := config.GetOAuth2Config(acct)
 	ctx := context.Background()
 	if httpClient != nil {
 		ctx = context.WithValue(ctx, oauth2.HTTPClient, httpClient)
 	}
-	ts := oauthCfg.TokenSource(ctx, oldToken)
-	newToken, err := ts.Token()
-	if err != nil {
-		return nil, err
+	token := *oldToken
+	token.Expiry = time.Now().Add(-time.Second)
+	ts := oauthCfg.TokenSource(ctx, &token)
+	var err error
+	for attempt := 0; ; attempt++ {
+		var newToken *oauth2.Token
+		newToken, err = ts.Token()
+		if err == nil {
+			return newToken, nil
+		}
+		if attempt == refreshRetries || !retryableRefreshError(err) {
+			return nil, err
+		}
+		time.Sleep(refreshRetryDelay)
 	}
-	return newToken, nil
+	return nil, err
+}
+
+func retryableRefreshError(err error) bool {
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return true
+	}
+	var retrieveErr *oauth2.RetrieveError
+	if errors.As(err, &retrieveErr) && retrieveErr.Response != nil {
+		status := retrieveErr.Response.StatusCode
+		return status == http.StatusTooManyRequests || status >= 500
+	}
+	return false
 }
 
 // checkExpiringTokens iterates configured accounts and refreshes tokens whose expiry is within expiryThreshold.
