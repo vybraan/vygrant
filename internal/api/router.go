@@ -3,7 +3,6 @@ package api
 import (
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/vybraan/vygrant/internal/auth"
 	"github.com/vybraan/vygrant/internal/storage"
 )
@@ -12,10 +11,10 @@ import (
 // and authentication initiation (GET "/auth"). The OAuth callback handler is provided the
 // given tokenStore and httpClient. It returns the configured http.Handler.
 func Router(tokenStore storage.TokenStore, httpClient *http.Client) http.Handler {
-	r := chi.NewRouter()
+	mux := http.NewServeMux()
 
-	r.Get("/", auth.HandleOAuthCallback(tokenStore, httpClient))
-	r.Get("/auth", auth.StartAuthFlow)
+	mux.HandleFunc("GET /{$}", auth.HandleOAuthCallback(tokenStore, httpClient))
+	mux.HandleFunc("GET /auth", auth.StartAuthFlow)
 
-	return r
+	return mux
 }

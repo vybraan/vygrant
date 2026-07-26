@@ -56,10 +56,6 @@ func newRefreshStore() (storage.TokenStore, string) {
 	return nil, ""
 }
 
-func newSplitWithRefresh(refresh storage.TokenStore) *storage.SplitStore {
-	return storage.NewSplitStore(refresh)
-}
-
 func NewDaemon() (*Daemon, error) {
 	confPath := os.Getenv("VYGRANT_CONFIG")
 	if confPath == "" {
@@ -98,7 +94,7 @@ func NewDaemon() (*Daemon, error) {
 func initPersistentStore(legacyTokenPath string) (storage.TokenStore, string) {
 	refresh, backend := newRefreshStore()
 	if refresh != nil {
-		splitStore := newSplitWithRefresh(refresh)
+		splitStore := storage.NewSplitStore(refresh)
 		if migrated, backupPath, err := migrateLegacyTokens(legacyTokenPath, splitStore); err != nil {
 			log.Printf("warning: failed to migrate legacy tokens: %v", err)
 		} else if migrated {

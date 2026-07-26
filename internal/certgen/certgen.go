@@ -105,10 +105,10 @@ func ensureCA(certPath, keyPath string) (*x509.Certificate, *ecdsa.PrivateKey, e
 	keyBytes, _ := x509.MarshalECPrivateKey(priv)
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyBytes})
 
-	if err := writeFile(certPath, certPEM, 0o600); err != nil {
+	if err := os.WriteFile(certPath, certPEM, 0o600); err != nil {
 		return nil, nil, err
 	}
-	if err := writeFile(keyPath, keyPEM, 0o600); err != nil {
+	if err := os.WriteFile(keyPath, keyPEM, 0o600); err != nil {
 		return nil, nil, err
 	}
 
@@ -170,10 +170,10 @@ func ensureLeaf(certPath, keyPath string, caCert *x509.Certificate, caKey *ecdsa
 	keyBytes, _ := x509.MarshalECPrivateKey(priv)
 	keyPEM = pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyBytes})
 
-	if err := writeFile(certPath, certPEM, 0o600); err != nil {
+	if err := os.WriteFile(certPath, certPEM, 0o600); err != nil {
 		return tls.Certificate{}, nil, err
 	}
-	if err := writeFile(keyPath, keyPEM, 0o600); err != nil {
+	if err := os.WriteFile(keyPath, keyPEM, 0o600); err != nil {
 		return tls.Certificate{}, nil, err
 	}
 
@@ -247,13 +247,6 @@ func hasLocalhostSANs(cert *x509.Certificate) bool {
 		}
 	}
 	return hasDNS && hasV4 && hasV6
-}
-
-func writeFile(path string, data []byte, perm os.FileMode) error {
-	if err := os.WriteFile(path, data, perm); err != nil {
-		return err
-	}
-	return nil
 }
 
 func ensureFilePermissions(path string, perm os.FileMode) error {
