@@ -49,7 +49,6 @@ func RefreshToken(account string, cfg *config.Config, oldToken *oauth2.Token, ht
 		}
 		time.Sleep(refreshRetryDelay)
 	}
-	return nil, err
 }
 
 func retryableRefreshError(err error) bool {
