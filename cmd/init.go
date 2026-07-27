@@ -36,7 +36,6 @@ token_event_cmd = ""
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize default configuration",
-	Long:  `Creates a default configuration file in your home directory (~/.config/vybr/vygrant.toml).`,
 	Run: func(cmd *cobra.Command, args []string) {
 		home, err := os.UserHomeDir()
 		if err != nil {

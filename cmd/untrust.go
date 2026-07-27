@@ -14,7 +14,6 @@ const trustCertName = "vygrant local CA"
 var untrustCmd = &cobra.Command{
 	Use:   "untrust",
 	Short: "Remove vygrant local CA certificate trust",
-	Long:  "Removes the vygrant local CA certificate from the OS or user trust store.",
 	Run: func(cmd *cobra.Command, args []string) {
 		system, _ := cmd.Flags().GetBool("system")
 		printOnly, _ := cmd.Flags().GetBool("print")

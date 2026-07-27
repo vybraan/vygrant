@@ -360,10 +360,8 @@ func migrateLegacyTokens(path string, store storage.TokenStore) (bool, string, e
 }
 
 func fileExists(path string) bool {
-	if _, err := os.Stat(path); err == nil {
-		return true
-	}
-	return false
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func validateConfig(cfg *config.Config) error {

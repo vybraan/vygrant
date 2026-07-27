@@ -10,7 +10,6 @@ import (
 var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: "Run the daemon auth",
-	Long:  "run the daemon to handle the oauth stuff",
 	Run: func(cmd *cobra.Command, args []string) {
 		daemon, err := daemon.NewDaemon()
 		if err != nil {

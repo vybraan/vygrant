@@ -15,7 +15,6 @@ import (
 var trustCmd = &cobra.Command{
 	Use:   "trust",
 	Short: "Trust vygrant local CA certificate",
-	Long:  "Adds the vygrant local CA certificate to the OS or user trust store.",
 	Run: func(cmd *cobra.Command, args []string) {
 		system, _ := cmd.Flags().GetBool("system")
 		printOnly, _ := cmd.Flags().GetBool("print")
